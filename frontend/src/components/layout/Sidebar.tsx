@@ -1,45 +1,89 @@
 import {
-  LayoutDashboard,
   Activity,
-  Trophy,
-  Brain,
   BarChart3,
+  Brain,
+  LayoutDashboard,
   Settings,
+  Trophy,
 } from "lucide-react";
 
+import { NavLink } from "react-router-dom";
+
 const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard" },
-  { icon: Activity, label: "Live Matches" },
-  { icon: Trophy, label: "Value Bets" },
-  { icon: BarChart3, label: "Statistics" },
-  { icon: Brain, label: "AI Predictions" },
-  { icon: Settings, label: "Settings" },
+  {
+    icon: LayoutDashboard,
+    label: "Dashboard",
+    path: "/",
+  },
+  {
+    icon: Activity,
+    label: "Live Matches",
+    path: "/live",
+    badge: "4",
+  },
+  {
+    icon: Trophy,
+    label: "Value Bets",
+    path: "/value-bets",
+  },
+  {
+    icon: BarChart3,
+    label: "Statistics",
+    path: "/statistics",
+  },
+  {
+    icon: Brain,
+    label: "AI Predictions",
+    path: "/predictions",
+  },
+  {
+    icon: Settings,
+    label: "Settings",
+    path: "/settings",
+  },
 ];
 
 export default function Sidebar() {
   return (
-    <aside className="w-72 bg-slate-800 border-r border-slate-700 flex flex-col">
-      <div className="p-6 border-b border-slate-700">
+    <aside className="flex min-h-screen w-72 shrink-0 flex-col border-r border-slate-700 bg-slate-800">
+      <div className="border-b border-slate-700 p-6">
         <h1 className="text-2xl font-bold text-cyan-400">
           AI Value Bet
         </h1>
-        <p className="text-sm text-slate-400 mt-1">
+
+        <p className="mt-1 text-sm text-slate-400">
           Football Analytics
         </p>
       </div>
 
-      <nav className="flex-1 p-4 space-y-2">
+      <nav className="flex-1 space-y-2 p-4">
         {menuItems.map((item) => {
           const Icon = item.icon;
 
           return (
-            <button
+            <NavLink
               key={item.label}
-              className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-slate-300 transition hover:bg-slate-700 hover:text-cyan-400"
+              to={item.path}
+              className={({ isActive }) =>
+                `flex w-full items-center gap-3 rounded-xl px-4 py-3 transition ${
+                  isActive
+                    ? "bg-cyan-500/10 text-cyan-400"
+                    : "text-slate-300 hover:bg-slate-700 hover:text-cyan-400"
+                }`
+              }
             >
               <Icon size={20} />
-              {item.label}
-            </button>
+
+              <span className="flex-1 text-left">
+                {item.label}
+              </span>
+
+              {item.badge && (
+                <span className="rounded-full bg-red-500/10 px-2 py-1 text-xs font-semibold text-red-400">
+                  {item.badge}
+                </span>
+              )}
+            </NavLink>
           );
         })}
       </nav>
