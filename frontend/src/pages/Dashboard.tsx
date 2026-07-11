@@ -7,6 +7,8 @@ import {
 
 import DashboardLayout from "../components/layout/DashboardLayout";
 import LiveMatchCard from "../components/dashboard/LiveMatchCard";
+import MarketBreakdown from "../components/dashboard/MarketBreakdown";
+import ProfitChart from "../components/dashboard/ProfitChart";
 import StatCard from "../components/dashboard/StatCard";
 import ValueBetTable from "../components/dashboard/ValueBetTable";
 
@@ -14,6 +16,7 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {/* Top statistics cards */}
         <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             title="Today's Matches"
@@ -42,9 +45,16 @@ export default function Dashboard() {
           />
         </section>
 
+        {/* Value bets table and live match */}
         <section className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,2fr)_minmax(340px,1fr)]">
           <ValueBetTable />
           <LiveMatchCard />
+        </section>
+
+        {/* Profit chart and market performance */}
+        <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+          <ProfitChart />
+          <MarketBreakdown />
         </section>
       </div>
     </DashboardLayout>
