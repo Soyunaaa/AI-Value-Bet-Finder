@@ -11,6 +11,7 @@ import MarketBreakdown from "../components/dashboard/MarketBreakdown";
 import ProfitChart from "../components/dashboard/ProfitChart";
 import RecentActivity from "../components/dashboard/RecentActivity";
 import StatCard from "../components/dashboard/StatCard";
+import UpcomingFixtures from "../components/dashboard/UpcomingFixtures";
 import ValueBetTable from "../components/dashboard/ValueBetTable";
 
 export default function Dashboard() {
@@ -52,6 +53,8 @@ export default function Dashboard() {
             description="since last scan"
           />
         </section>
+
+        <UpcomingFixtures />
 
         <section className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,2fr)_minmax(340px,1fr)]">
           <ValueBetTable />
