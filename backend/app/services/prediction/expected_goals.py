@@ -1,6 +1,6 @@
 from app.models.team_strength import TeamStrengthRating
-
 from app.services.prediction.league_calibration import (
+    LeagueCalibration,
     get_league_calibration,
 )
 
@@ -38,9 +38,14 @@ def estimate_expected_goals(
     home_advantage: bool,
     elo_difference: float = 0,
     competition_code: str | None = None,
+    calibration: LeagueCalibration | None = None,
 ) -> float:
-    calibration = get_league_calibration(
-        competition_code
+    selected_calibration = (
+        calibration
+        if calibration is not None
+        else get_league_calibration(
+            competition_code
+        )
     )
 
     recent_attack_component = (
@@ -76,12 +81,13 @@ def estimate_expected_goals(
     )
 
     expected_goals *= (
-        calibration.goal_environment
+        selected_calibration.goal_environment
     )
 
     if home_advantage:
         expected_goals *= (
-            calibration.home_advantage_multiplier
+            selected_calibration
+            .home_advantage_multiplier
         )
 
     return round(

@@ -7,13 +7,18 @@ from app.database.models.match import MatchRecord
 from app.models.database import FixtureSyncResult
 from app.models.football import FootballFixture
 from app.services.football_service import FootballService
+from app.services.league_statistics_service import (
+    LeagueStatisticsService,
+)
 from app.services.persistent_elo_service import (
     PersistentEloService,
 )
 from app.services.team_statistics_builder import (
     TeamStatisticsBuilder,
 )
-
+from app.services.prediction_grading_service import (
+    PredictionGradingService,
+)
 
 def fixture_has_changed(
     *,
@@ -58,11 +63,9 @@ def update_match_record(
     record.competition_id = (
         fixture.competition.id
     )
-
     record.competition_code = (
         fixture.competition.code
     )
-
     record.competition_name = (
         fixture.competition.name
     )
@@ -71,29 +74,18 @@ def update_match_record(
     record.kickoff_utc = fixture.utc_date
     record.status = fixture.status.value
 
-    record.home_team_id = (
-        fixture.home_team.id
-    )
-
+    record.home_team_id = fixture.home_team.id
     record.home_team_name = (
         fixture.home_team.name
     )
 
-    record.away_team_id = (
-        fixture.away_team.id
-    )
-
+    record.away_team_id = fixture.away_team.id
     record.away_team_name = (
         fixture.away_team.name
     )
 
-    record.home_score = (
-        fixture.full_time.home
-    )
-
-    record.away_score = (
-        fixture.full_time.away
-    )
+    record.home_score = fixture.full_time.home
+    record.away_score = fixture.full_time.away
 
 
 def create_match_record(
@@ -101,9 +93,7 @@ def create_match_record(
 ) -> MatchRecord:
     return MatchRecord(
         provider_match_id=fixture.id,
-        competition_id=(
-            fixture.competition.id
-        ),
+        competition_id=fixture.competition.id,
         competition_code=(
             fixture.competition.code
         ),
@@ -113,39 +103,27 @@ def create_match_record(
         matchday=fixture.matchday,
         kickoff_utc=fixture.utc_date,
         status=fixture.status.value,
-        home_team_id=(
-            fixture.home_team.id
-        ),
-        home_team_name=(
-            fixture.home_team.name
-        ),
-        away_team_id=(
-            fixture.away_team.id
-        ),
-        away_team_name=(
-            fixture.away_team.name
-        ),
-        home_score=(
-            fixture.full_time.home
-        ),
-        away_score=(
-            fixture.full_time.away
-        ),
+        home_team_id=fixture.home_team.id,
+        home_team_name=fixture.home_team.name,
+        away_team_id=fixture.away_team.id,
+        away_team_name=fixture.away_team.name,
+        home_score=fixture.full_time.home,
+        away_score=fixture.full_time.away,
     )
 
 
 class FixtureSyncService:
     def __init__(self) -> None:
-        self.football_service = (
-            FootballService()
-        )
+        self.football_service = FootballService()
 
         self.statistics_builder = (
             TeamStatisticsBuilder()
         )
 
-        self.elo_service = (
-            PersistentEloService()
+        self.elo_service = PersistentEloService()
+
+        self.league_statistics_service = (
+            LeagueStatisticsService()
         )
 
     async def sync_competition(
@@ -212,11 +190,8 @@ class FixtureSyncService:
 
             if existing_record is None:
                 session.add(
-                    create_match_record(
-                        fixture
-                    )
+                    create_match_record(fixture)
                 )
-
                 inserted += 1
                 continue
 
@@ -228,13 +203,10 @@ class FixtureSyncService:
                     record=existing_record,
                     fixture=fixture,
                 )
-
                 updated += 1
             else:
                 unchanged += 1
 
-        # Make fixture changes visible before the
-        # statistics and Elo queries run.
         await session.flush()
 
         statistics_result = (
@@ -253,6 +225,19 @@ class FixtureSyncService:
             )
         )
 
+        league_statistics_result = (
+            await self.league_statistics_service
+            .rebuild_competition(
+                session=session,
+                competition_code=normalized_code,
+            )
+        )
+
+        await self.prediction_grading_service\
+            .grade_pending_predictions(
+                session=session,
+                competition_code=normalized_code,
+    )
         count_statement = select(
             func.count(MatchRecord.id)
         )
@@ -278,6 +263,10 @@ class FixtureSyncService:
             statistics=statistics_result,
             elo_rebuilt=True,
             elo=elo_result,
+            league_statistics_rebuilt=True,
+            league_statistics=(
+                league_statistics_result
+            ),
         )
 
 

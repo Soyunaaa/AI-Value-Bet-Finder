@@ -38,7 +38,9 @@ from app.database.session import (
     close_database,
     initialize_database,
 )
-
+from app.api.prediction_history import (
+    router as prediction_history_router,
+)
 
 @asynccontextmanager
 async def lifespan(
@@ -141,5 +143,9 @@ app.include_router(
 
 app.include_router(
     database_router,
+    prefix="/api",
+)
+app.include_router(
+    prediction_history_router,
     prefix="/api",
 )

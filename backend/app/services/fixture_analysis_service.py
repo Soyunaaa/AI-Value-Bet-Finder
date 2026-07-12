@@ -1,3 +1,5 @@
+from app.database.session import AsyncSessionFactory
+from app.models.elo import FixtureEloSummary
 from app.models.fixture_analysis import (
     AnalysisDataSources,
     FixtureAnalysisResult,
@@ -12,6 +14,9 @@ from app.models.prediction import (
 from app.services.fixture_data_service import (
     FixtureDataService,
 )
+from app.services.league_statistics_service import (
+    LeagueStatisticsService,
+)
 from app.services.persistent_elo_lookup_service import (
     get_persistent_fixture_elo,
 )
@@ -20,11 +25,13 @@ from app.services.prediction.confidence import (
 )
 from app.services.prediction.elo import (
     build_fixture_elo,
+    expected_score,
 )
 from app.services.prediction.expected_goals import (
     estimate_expected_goals,
 )
 from app.services.prediction.league_calibration import (
+    LeagueCalibration,
     get_league_calibration,
 )
 from app.services.prediction.reasons import (
@@ -40,9 +47,39 @@ from app.services.team_statistics_service import (
 from app.services.team_strength_service import (
     build_team_strength,
 )
-
+from app.services.prediction_snapshot_service import (
+    save_prediction_snapshot,
+)
 
 RECENT_MATCH_LIMIT = 10
+
+
+def apply_league_calibration_to_elo(
+    *,
+    elo: FixtureEloSummary,
+    calibration: LeagueCalibration,
+) -> FixtureEloSummary:
+    expected_home = expected_score(
+        rating=(
+            elo.home.rating
+            + calibration.elo_home_advantage
+        ),
+        opponent_rating=elo.away.rating,
+    )
+
+    return FixtureEloSummary(
+        home=elo.home,
+        away=elo.away,
+        rating_difference=elo.rating_difference,
+        expected_home_score=round(
+            expected_home,
+            4,
+        ),
+        expected_away_score=round(
+            1 - expected_home,
+            4,
+        ),
+    )
 
 
 def summarize_team_form(
@@ -145,6 +182,7 @@ def summarize_team_form(
 class FixtureAnalysisService:
     def __init__(self) -> None:
         self.fixture_data = FixtureDataService()
+        self.league_statistics_service = LeagueStatisticsService()
 
     async def analyse_fixture(
         self,
@@ -257,11 +295,35 @@ class FixtureAnalysisService:
                 "calculated"
             )
 
-        league_calibration = (
-            get_league_calibration(
-                competition_code
-            )
+        fallback_calibration = get_league_calibration(
+            competition_code
         )
+
+        async with AsyncSessionFactory() as session:
+            league_statistics = (
+                await self.league_statistics_service
+                .get_competition_statistics(
+                    session=session,
+                    competition_code=competition_code,
+                )
+            )
+
+        if league_statistics is None:
+            league_calibration = fallback_calibration
+        else:
+            league_calibration = LeagueCalibration(
+                competition_code=competition_code,
+                goal_environment=(
+                    league_statistics.goal_environment
+                ),
+                home_advantage_multiplier=(
+                    league_statistics
+                    .home_advantage_multiplier
+                ),
+                elo_home_advantage=(
+                    league_statistics.elo_home_advantage
+                ),
+            )
 
         persistent_elo = (
             await get_persistent_fixture_elo(
@@ -313,6 +375,11 @@ class FixtureAnalysisService:
 
             elo_source = "calculated"
 
+        elo = apply_league_calibration_to_elo(
+            elo=elo,
+            calibration=league_calibration,
+        )
+
         home_expected_goals = (
             estimate_expected_goals(
                 attacking_team=home_strength,
@@ -329,9 +396,7 @@ class FixtureAnalysisService:
                 elo_difference=(
                     elo.rating_difference
                 ),
-                competition_code=(
-                    competition_code
-                ),
+                calibration=league_calibration,
             )
         )
 
@@ -351,9 +416,7 @@ class FixtureAnalysisService:
                 elo_difference=(
                     -elo.rating_difference
                 ),
-                competition_code=(
-                    competition_code
-                ),
+                calibration=league_calibration,
             )
         )
 
@@ -408,7 +471,7 @@ class FixtureAnalysisService:
             ),
         )
 
-        return FixtureAnalysisResult(
+        analysis = FixtureAnalysisResult(
             fixture=fixture,
             home_form=home_form,
             away_form=away_form,
@@ -418,12 +481,10 @@ class FixtureAnalysisService:
             league_calibration=(
                 LeagueCalibrationSummary(
                     competition_code=(
-                        league_calibration
-                        .competition_code
+                        league_calibration.competition_code
                     ),
                     goal_environment=(
-                        league_calibration
-                        .goal_environment
+                        league_calibration.goal_environment
                     ),
                     home_advantage_multiplier=(
                         league_calibration
@@ -461,6 +522,12 @@ class FixtureAnalysisService:
             confidence=confidence,
             reasons=reasons,
         )
+
+        await save_prediction_snapshot(
+            analysis=analysis,
+        )
+
+        return analysis
 
 
 def get_fixture_analysis_service(

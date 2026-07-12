@@ -26,6 +26,12 @@ class EloBuildResult(BaseModel):
     history_rows_created: int = Field(ge=0)
 
 
+class LeagueStatisticsBuildResult(BaseModel):
+    competition_code: str
+    matches_processed: int = Field(ge=0)
+    statistics_created: bool
+
+
 class FixtureSyncResult(BaseModel):
     competition_code: str
 
@@ -41,6 +47,11 @@ class FixtureSyncResult(BaseModel):
 
     elo_rebuilt: bool
     elo: EloBuildResult | None = None
+
+    league_statistics_rebuilt: bool
+    league_statistics: (
+        LeagueStatisticsBuildResult | None
+    ) = None
 
 
 class TeamStatisticsResponse(BaseModel):
@@ -100,12 +111,6 @@ class EloHistoryResponse(BaseModel):
     rating_before: float
     rating_after: float
     rating_change: float
-
-
-class LeagueStatisticsBuildResult(BaseModel):
-    competition_code: str
-    matches_processed: int = Field(ge=0)
-    statistics_created: bool
 
 
 class LeagueStatisticsResponse(BaseModel):
