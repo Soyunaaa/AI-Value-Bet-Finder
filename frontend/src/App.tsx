@@ -5,6 +5,7 @@ import {
   Routes,
 } from "react-router-dom";
 
+import Analysis from "./pages/Analysis";
 import Dashboard from "./pages/Dashboard";
 import Live from "./pages/Live";
 import ValueBets from "./pages/ValueBets";
@@ -15,8 +16,18 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/live" element={<Live />} />
-        <Route path="/value-bets" element={<ValueBets />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route
+          path="/value-bets"
+          element={<ValueBets />}
+        />
+        <Route
+          path="/analysis/:id"
+          element={<Analysis />}
+        />
+        <Route
+          path="*"
+          element={<Navigate to="/" replace />}
+        />
       </Routes>
     </BrowserRouter>
   );

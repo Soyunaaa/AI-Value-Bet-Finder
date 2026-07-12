@@ -1,10 +1,11 @@
 import {
-  ArrowRight,
   Building2,
   ChartNoAxesCombined,
   Sparkles,
   Star,
 } from "lucide-react";
+
+import { Link } from "react-router-dom";
 
 import type { ValueBet } from "../../data/valueBets";
 
@@ -17,13 +18,22 @@ function getStars(confidence: number) {
   if (confidence >= 88) return 4;
   if (confidence >= 84) return 3;
   if (confidence >= 80) return 2;
+
   return 1;
 }
 
-export default function ValueBetCard({ bet }: ValueBetCardProps) {
+export default function ValueBetCard({
+  bet,
+}: ValueBetCardProps) {
   const stars = getStars(bet.confidence);
-  const modelProbability = Math.round((1 / bet.fairOdds) * 100);
-  const bookmakerProbability = Math.round((1 / bet.odds) * 100);
+
+  const modelProbability = Math.round(
+    (1 / bet.fairOdds) * 100
+  );
+
+  const bookmakerProbability = Math.round(
+    (1 / bet.odds) * 100
+  );
 
   return (
     <article className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 transition duration-200 hover:-translate-y-1 hover:border-cyan-500/60">
@@ -37,6 +47,10 @@ export default function ValueBetCard({ bet }: ValueBetCardProps) {
             <h2 className="mt-2 text-lg font-bold text-white">
               {bet.match}
             </h2>
+
+            <p className="mt-1 text-xs text-slate-500">
+              Kickoff {bet.kickoff}
+            </p>
           </div>
 
           <div className="flex">
@@ -132,19 +146,21 @@ export default function ValueBetCard({ bet }: ValueBetCardProps) {
 
         <div className="mt-5 flex items-center justify-between">
           <div>
-            <p className="text-xs text-slate-500">Bookmaker</p>
+            <p className="text-xs text-slate-500">
+              Bookmaker
+            </p>
+
             <p className="mt-1 font-semibold text-white">
               {bet.bookmaker}
             </p>
           </div>
 
-          <button
-            type="button"
-            className="flex items-center gap-2 rounded-xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400"
+          <Link
+            to={`/analysis/${bet.id}`}
+            className="rounded-xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400"
           >
             Analyse
-            <ArrowRight size={17} />
-          </button>
+          </Link>
         </div>
       </div>
     </article>
@@ -157,11 +173,18 @@ interface MetricProps {
   color: string;
 }
 
-function Metric({ label, value, color }: MetricProps) {
+function Metric({
+  label,
+  value,
+  color,
+}: MetricProps) {
   return (
     <div className="rounded-xl bg-slate-900/60 p-3">
       <p className="text-xs text-slate-500">{label}</p>
-      <p className={`mt-2 text-lg font-bold ${color}`}>{value}</p>
+
+      <p className={`mt-2 text-lg font-bold ${color}`}>
+        {value}
+      </p>
     </div>
   );
 }
