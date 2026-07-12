@@ -18,6 +18,14 @@ class TeamStatisticsBuildResult(BaseModel):
     teams_total: int = Field(ge=0)
 
 
+class EloBuildResult(BaseModel):
+    competition_code: str
+
+    matches_processed: int = Field(ge=0)
+    teams_rated: int = Field(ge=0)
+    history_rows_created: int = Field(ge=0)
+
+
 class FixtureSyncResult(BaseModel):
     competition_code: str
 
@@ -30,6 +38,9 @@ class FixtureSyncResult(BaseModel):
 
     statistics_rebuilt: bool
     statistics: TeamStatisticsBuildResult | None = None
+
+    elo_rebuilt: bool
+    elo: EloBuildResult | None = None
 
 
 class TeamStatisticsResponse(BaseModel):
@@ -60,14 +71,6 @@ class TeamStatisticsResponse(BaseModel):
 
     last_five_form: str
     last_ten_form: str
-
-
-class EloBuildResult(BaseModel):
-    competition_code: str
-
-    matches_processed: int = Field(ge=0)
-    teams_rated: int = Field(ge=0)
-    history_rows_created: int = Field(ge=0)
 
 
 class TeamEloResponse(BaseModel):

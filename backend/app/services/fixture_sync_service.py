@@ -1,24 +1,14 @@
 from datetime import date
 
-from sqlalchemy import (
-    func,
-    select,
-)
-from sqlalchemy.ext.asyncio import (
-    AsyncSession,
-)
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.models.match import (
-    MatchRecord,
-)
-from app.models.database import (
-    FixtureSyncResult,
-)
-from app.models.football import (
-    FootballFixture,
-)
-from app.services.football_service import (
-    FootballService,
+from app.database.models.match import MatchRecord
+from app.models.database import FixtureSyncResult
+from app.models.football import FootballFixture
+from app.services.football_service import FootballService
+from app.services.persistent_elo_service import (
+    PersistentEloService,
 )
 from app.services.team_statistics_builder import (
     TeamStatisticsBuilder,
@@ -34,37 +24,26 @@ def fixture_has_changed(
         [
             record.competition_id
             != fixture.competition.id,
-
             record.competition_code
             != fixture.competition.code,
-
             record.competition_name
             != fixture.competition.name,
-
             record.matchday
             != fixture.matchday,
-
             record.kickoff_utc
             != fixture.utc_date,
-
             record.status
             != fixture.status.value,
-
             record.home_team_id
             != fixture.home_team.id,
-
             record.home_team_name
             != fixture.home_team.name,
-
             record.away_team_id
             != fixture.away_team.id,
-
             record.away_team_name
             != fixture.away_team.name,
-
             record.home_score
             != fixture.full_time.home,
-
             record.away_score
             != fixture.full_time.away,
         ]
@@ -122,43 +101,33 @@ def create_match_record(
 ) -> MatchRecord:
     return MatchRecord(
         provider_match_id=fixture.id,
-
         competition_id=(
             fixture.competition.id
         ),
-
         competition_code=(
             fixture.competition.code
         ),
-
         competition_name=(
             fixture.competition.name
         ),
-
         matchday=fixture.matchday,
         kickoff_utc=fixture.utc_date,
         status=fixture.status.value,
-
         home_team_id=(
             fixture.home_team.id
         ),
-
         home_team_name=(
             fixture.home_team.name
         ),
-
         away_team_id=(
             fixture.away_team.id
         ),
-
         away_team_name=(
             fixture.away_team.name
         ),
-
         home_score=(
             fixture.full_time.home
         ),
-
         away_score=(
             fixture.full_time.away
         ),
@@ -173,6 +142,10 @@ class FixtureSyncService:
 
         self.statistics_builder = (
             TeamStatisticsBuilder()
+        )
+
+        self.elo_service = (
+            PersistentEloService()
         )
 
     async def sync_competition(
@@ -210,11 +183,12 @@ class FixtureSyncService:
         ] = {}
 
         if fixture_ids:
-            statement = select(
-                MatchRecord
-            ).where(
-                MatchRecord.provider_match_id.in_(
-                    fixture_ids
+            statement = (
+                select(MatchRecord)
+                .where(
+                    MatchRecord.provider_match_id.in_(
+                        fixture_ids
+                    )
                 )
             )
 
@@ -259,12 +233,20 @@ class FixtureSyncService:
             else:
                 unchanged += 1
 
-        # Flush fixture changes before the statistics
-        # builder queries the matches table.
+        # Make fixture changes visible before the
+        # statistics and Elo queries run.
         await session.flush()
 
         statistics_result = (
             await self.statistics_builder
+            .rebuild_competition(
+                session=session,
+                competition_code=normalized_code,
+            )
+        )
+
+        elo_result = (
+            await self.elo_service
             .rebuild_competition(
                 session=session,
                 competition_code=normalized_code,
@@ -294,6 +276,8 @@ class FixtureSyncService:
             ),
             statistics_rebuilt=True,
             statistics=statistics_result,
+            elo_rebuilt=True,
+            elo=elo_result,
         )
 
 
