@@ -80,6 +80,11 @@ export interface FixtureAnalysis {
   home_strength: TeamStrengthRating;
   away_strength: TeamStrengthRating;
 
+  elo: FixtureEloSummary;
+  league_calibration: LeagueCalibrationSummary;
+
+  data_sources: AnalysisDataSources;
+
   home_expected_goals: number;
   away_expected_goals: number;
 
@@ -87,4 +92,38 @@ export interface FixtureAnalysis {
 
   confidence: number;
   reasons: string[];
+}
+export interface TeamEloRating {
+  team_id: number;
+  team_name: string;
+  rating: number;
+  matches_processed: number;
+}
+
+export interface FixtureEloSummary {
+  home: TeamEloRating;
+  away: TeamEloRating;
+
+  rating_difference: number;
+  expected_home_score: number;
+  expected_away_score: number;
+}
+export interface LeagueCalibrationSummary {
+  competition_code: string;
+  goal_environment: number;
+  home_advantage_multiplier: number;
+  elo_home_advantage: number;
+}
+export type AnalysisDataSource =
+  | "database"
+  | "external_api"
+  | "merged"
+  | "calculated";
+
+export interface AnalysisDataSources {
+  fixture: AnalysisDataSource;
+  home_history: AnalysisDataSource;
+  away_history: AnalysisDataSource;
+  home_statistics: AnalysisDataSource;
+  away_statistics: AnalysisDataSource;
 }
