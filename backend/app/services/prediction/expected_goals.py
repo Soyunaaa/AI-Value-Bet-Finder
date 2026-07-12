@@ -1,7 +1,10 @@
 from app.models.team_strength import TeamStrengthRating
 
+from app.services.prediction.league_calibration import (
+    get_league_calibration,
+)
 
-HOME_ADVANTAGE_MULTIPLIER = 1.08
+
 MINIMUM_EXPECTED_GOALS = 0.2
 MAXIMUM_EXPECTED_GOALS = 4.5
 
@@ -34,7 +37,12 @@ def estimate_expected_goals(
     opponent_venue_conceding_average: float,
     home_advantage: bool,
     elo_difference: float = 0,
+    competition_code: str | None = None,
 ) -> float:
+    calibration = get_league_calibration(
+        competition_code
+    )
+
     recent_attack_component = (
         attacking_team.average_goals_scored
     )
@@ -50,7 +58,10 @@ def estimate_expected_goals(
 
     rating_component = (
         attacking_team.attack_rating
-        + (100 - defending_team.defence_rating)
+        + (
+            100
+            - defending_team.defence_rating
+        )
     ) / 200
 
     expected_goals = (
@@ -64,8 +75,14 @@ def estimate_expected_goals(
         elo_difference
     )
 
+    expected_goals *= (
+        calibration.goal_environment
+    )
+
     if home_advantage:
-        expected_goals *= HOME_ADVANTAGE_MULTIPLIER
+        expected_goals *= (
+            calibration.home_advantage_multiplier
+        )
 
     return round(
         clamp(

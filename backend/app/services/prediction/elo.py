@@ -6,11 +6,13 @@ from app.models.elo import (
     TeamEloRating,
 )
 from app.models.football import FootballFixture
-
+from app.services.prediction.league_calibration import (
+    get_league_calibration,
+)
 
 INITIAL_ELO = 1500.0
 K_FACTOR = 28.0
-HOME_ADVANTAGE_ELO = 65.0
+
 
 # A result loses half its weighting every 120 days.
 RECENCY_HALF_LIFE_DAYS = 120.0
@@ -113,7 +115,15 @@ def build_fixture_elo(
     away_team_name: str,
     matches: list[FootballFixture],
     as_of: datetime,
+    competition_code: str | None = None,
 ) -> FixtureEloSummary:
+    calibration = get_league_calibration(
+        competition_code
+    )
+
+    home_advantage_elo = (
+        calibration.elo_home_advantage
+    )
     ratings: defaultdict[int, float] = defaultdict(
         lambda: INITIAL_ELO
     )
@@ -158,7 +168,7 @@ def build_fixture_elo(
 
         adjusted_home_rating = (
             home_rating
-            + HOME_ADVANTAGE_ELO
+            + home_advantage_elo
         )
 
         expected_home = expected_score(
@@ -237,7 +247,7 @@ def build_fixture_elo(
     expected_home = expected_score(
         rating=(
             home_rating
-            + HOME_ADVANTAGE_ELO
+            + home_advantage_elo
         ),
         opponent_rating=away_rating,
     )

@@ -1,5 +1,6 @@
 from app.models.fixture_analysis import (
     FixtureAnalysisResult,
+    LeagueCalibrationSummary,
     TeamFormSummary,
 )
 from app.models.football import FootballFixture
@@ -17,6 +18,9 @@ from app.services.prediction.elo import (
 )
 from app.services.prediction.expected_goals import (
     estimate_expected_goals,
+)
+from app.services.prediction.league_calibration import (
+    get_league_calibration,
 )
 from app.services.prediction.reasons import (
     build_reasons,
@@ -175,6 +179,12 @@ class FixtureAnalysisService:
             matches=away_matches,
         )
 
+        league_calibration = (
+            get_league_calibration(
+                fixture.competition.code
+            )
+        )
+
         elo = build_fixture_elo(
             home_team_id=fixture.home_team.id,
             home_team_name=fixture.home_team.name,
@@ -185,7 +195,10 @@ class FixtureAnalysisService:
                 *away_matches,
             ],
             as_of=fixture.utc_date,
-)
+            competition_code=(
+                fixture.competition.code
+            ),
+        )
 
         home_expected_goals = (
             estimate_expected_goals(
@@ -200,6 +213,9 @@ class FixtureAnalysisService:
                 home_advantage=True,
                 elo_difference=(
                     elo.rating_difference
+                ),
+                competition_code=(
+                    fixture.competition.code
                 ),
             )
         )
@@ -217,6 +233,9 @@ class FixtureAnalysisService:
                 home_advantage=False,
                 elo_difference=(
                     -elo.rating_difference
+                ),
+                competition_code=(
+                    fixture.competition.code
                 ),
             )
         )
@@ -271,6 +290,26 @@ class FixtureAnalysisService:
             home_strength=home_strength,
             away_strength=away_strength,
             elo=elo,
+            league_calibration=(
+                LeagueCalibrationSummary(
+                    competition_code=(
+                        league_calibration
+                        .competition_code
+                    ),
+                    goal_environment=(
+                        league_calibration
+                        .goal_environment
+                    ),
+                    home_advantage_multiplier=(
+                        league_calibration
+                        .home_advantage_multiplier
+                    ),
+                    elo_home_advantage=(
+                        league_calibration
+                        .elo_home_advantage
+                    ),
+                )
+            ),
             home_expected_goals=(
                 home_expected_goals
             ),
