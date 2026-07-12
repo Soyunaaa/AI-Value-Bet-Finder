@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -58,3 +60,40 @@ class TeamStatisticsResponse(BaseModel):
 
     last_five_form: str
     last_ten_form: str
+
+
+class EloBuildResult(BaseModel):
+    competition_code: str
+
+    matches_processed: int = Field(ge=0)
+    teams_rated: int = Field(ge=0)
+    history_rows_created: int = Field(ge=0)
+
+
+class TeamEloResponse(BaseModel):
+    team_id: int
+    team_name: str
+    competition_code: str
+
+    rating: float
+    matches_processed: int
+    updated_at: datetime
+
+
+class EloHistoryResponse(BaseModel):
+    provider_match_id: int
+    competition_code: str
+    kickoff_utc: datetime
+
+    team_id: int
+    team_name: str
+
+    opponent_team_id: int
+    opponent_team_name: str
+
+    venue: str
+    result: str
+
+    rating_before: float
+    rating_after: float
+    rating_change: float

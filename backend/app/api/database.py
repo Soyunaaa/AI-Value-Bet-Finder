@@ -1,4 +1,3 @@
-from sqlalchemy import func, select
 from datetime import date
 
 from fastapi import (
@@ -7,29 +6,30 @@ from fastapi import (
     HTTPException,
     Query,
 )
+from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import (
-    AsyncSession,
-)
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.session import (
-    get_database_session,
-)
+from app.database.models.match import MatchRecord
+from app.database.session import get_database_session
 from app.models.database import (
     DatabaseStatus,
+    EloBuildResult,
+    EloHistoryResponse,
     FixtureSyncResult,
+    TeamEloResponse,
     TeamStatisticsBuildResult,
     TeamStatisticsResponse,
 )
-from app.providers.football_data import (
-    FootballDataApiError,
-)
-from app.services.database_service import (
-    get_database_status,
-)
+from app.providers.football_data import FootballDataApiError
+from app.services.database_service import get_database_status
 from app.services.fixture_sync_service import (
     FixtureSyncService,
     get_fixture_sync_service,
+)
+from app.services.persistent_elo_service import (
+    PersistentEloService,
+    get_persistent_elo_service,
 )
 from app.services.team_statistics_builder import (
     TeamStatisticsBuilder,
@@ -150,9 +150,7 @@ async def rebuild_team_statistics(
 
         raise HTTPException(
             status_code=503,
-            detail=(
-                "Team statistics rebuild failed."
-            ),
+            detail="Team statistics rebuild failed.",
         ) from exc
 
 
@@ -181,12 +179,11 @@ async def read_team_statistics(
                 "Unable to read team statistics."
             ),
         ) from exc
-        from sqlalchemy import func, select
-
-from app.database.models.match import MatchRecord
 
 
-@router.get("/debug/match-statuses")
+@router.get(
+    "/debug/match-statuses",
+)
 async def debug_match_statuses(
     session: AsyncSession = Depends(
         get_database_session
@@ -197,11 +194,17 @@ async def debug_match_statuses(
             MatchRecord.status,
             func.count(MatchRecord.id),
         )
-        .group_by(MatchRecord.status)
-        .order_by(MatchRecord.status)
+        .group_by(
+            MatchRecord.status
+        )
+        .order_by(
+            MatchRecord.status
+        )
     )
 
-    result = await session.execute(statement)
+    result = await session.execute(
+        statement
+    )
 
     return [
         {
@@ -210,3 +213,89 @@ async def debug_match_statuses(
         }
         for status, count in result.all()
     ]
+
+
+@router.post(
+    "/elo/rebuild/{competition_code}",
+    response_model=EloBuildResult,
+)
+async def rebuild_competition_elo(
+    competition_code: str,
+    session: AsyncSession = Depends(
+        get_database_session
+    ),
+    service: PersistentEloService = Depends(
+        get_persistent_elo_service
+    ),
+) -> EloBuildResult:
+    try:
+        return await service.rebuild_competition(
+            session=session,
+            competition_code=competition_code,
+        )
+
+    except SQLAlchemyError as exc:
+        await session.rollback()
+
+        raise HTTPException(
+            status_code=503,
+            detail="Elo rebuild failed.",
+        ) from exc
+
+
+@router.get(
+    "/elo/{competition_code}",
+    response_model=list[
+        TeamEloResponse
+    ],
+)
+async def read_competition_elo(
+    competition_code: str,
+    session: AsyncSession = Depends(
+        get_database_session
+    ),
+    service: PersistentEloService = Depends(
+        get_persistent_elo_service
+    ),
+) -> list[TeamEloResponse]:
+    try:
+        return await service.get_competition_ratings(
+            session=session,
+            competition_code=competition_code,
+        )
+
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Unable to read Elo ratings.",
+        ) from exc
+
+
+@router.get(
+    "/elo/{competition_code}/{team_id}/history",
+    response_model=list[
+        EloHistoryResponse
+    ],
+)
+async def read_team_elo_history(
+    competition_code: str,
+    team_id: int,
+    session: AsyncSession = Depends(
+        get_database_session
+    ),
+    service: PersistentEloService = Depends(
+        get_persistent_elo_service
+    ),
+) -> list[EloHistoryResponse]:
+    try:
+        return await service.get_team_history(
+            session=session,
+            competition_code=competition_code,
+            team_id=team_id,
+        )
+
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Unable to read Elo history.",
+        ) from exc

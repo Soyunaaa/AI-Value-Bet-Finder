@@ -4,8 +4,12 @@ from pydantic import BaseModel, Field
 
 from app.models.elo import FixtureEloSummary
 from app.models.football import FootballFixture
-from app.models.prediction import MatchPredictionResult
-from app.models.team_strength import TeamStrengthRating
+from app.models.prediction import (
+    MatchPredictionResult,
+)
+from app.models.team_strength import (
+    TeamStrengthRating,
+)
 
 
 DataSourceName = Literal[
@@ -28,9 +32,17 @@ class TeamFormSummary(BaseModel):
     goals_scored: int
     goals_conceded: int
 
-    average_goals_scored: float = Field(ge=0)
-    average_goals_conceded: float = Field(ge=0)
-    points_per_game: float = Field(ge=0)
+    average_goals_scored: float = Field(
+        ge=0
+    )
+
+    average_goals_conceded: float = Field(
+        ge=0
+    )
+
+    points_per_game: float = Field(
+        ge=0
+    )
 
 
 class LeagueCalibrationSummary(BaseModel):
@@ -49,6 +61,8 @@ class AnalysisDataSources(BaseModel):
     home_statistics: DataSourceName
     away_statistics: DataSourceName
 
+    elo: DataSourceName
+
 
 class FixtureAnalysisResult(BaseModel):
     fixture: FootballFixture
@@ -61,14 +75,25 @@ class FixtureAnalysisResult(BaseModel):
 
     elo: FixtureEloSummary
 
-    league_calibration: LeagueCalibrationSummary
+    league_calibration: (
+        LeagueCalibrationSummary
+    )
 
     data_sources: AnalysisDataSources
 
-    home_expected_goals: float = Field(ge=0)
-    away_expected_goals: float = Field(ge=0)
+    home_expected_goals: float = Field(
+        ge=0
+    )
+
+    away_expected_goals: float = Field(
+        ge=0
+    )
 
     prediction: MatchPredictionResult
 
-    confidence: float = Field(ge=0, le=100)
+    confidence: float = Field(
+        ge=0,
+        le=100,
+    )
+
     reasons: list[str]

@@ -12,6 +12,9 @@ from app.models.prediction import (
 from app.services.fixture_data_service import (
     FixtureDataService,
 )
+from app.services.persistent_elo_lookup_service import (
+    get_persistent_fixture_elo,
+)
 from app.services.prediction.confidence import (
     calculate_confidence,
 )
@@ -219,7 +222,9 @@ class FixtureAnalysisService:
                 )
             )
 
-            home_statistics_source = "database"
+            home_statistics_source = (
+                "database"
+            )
         else:
             home_strength = build_team_strength(
                 team_id=fixture.home_team.id,
@@ -227,7 +232,9 @@ class FixtureAnalysisService:
                 matches=home_matches,
             )
 
-            home_statistics_source = "calculated"
+            home_statistics_source = (
+                "calculated"
+            )
 
         if away_statistics_record is not None:
             away_strength = (
@@ -236,7 +243,9 @@ class FixtureAnalysisService:
                 )
             )
 
-            away_statistics_source = "database"
+            away_statistics_source = (
+                "database"
+            )
         else:
             away_strength = build_team_strength(
                 team_id=fixture.away_team.id,
@@ -244,7 +253,9 @@ class FixtureAnalysisService:
                 matches=away_matches,
             )
 
-            away_statistics_source = "calculated"
+            away_statistics_source = (
+                "calculated"
+            )
 
         league_calibration = (
             get_league_calibration(
@@ -252,18 +263,55 @@ class FixtureAnalysisService:
             )
         )
 
-        elo = build_fixture_elo(
-            home_team_id=fixture.home_team.id,
-            home_team_name=fixture.home_team.name,
-            away_team_id=fixture.away_team.id,
-            away_team_name=fixture.away_team.name,
-            matches=[
-                *home_matches,
-                *away_matches,
-            ],
-            as_of=fixture.utc_date,
-            competition_code=competition_code,
+        persistent_elo = (
+            await get_persistent_fixture_elo(
+                home_team_id=(
+                    fixture.home_team.id
+                ),
+                home_team_name=(
+                    fixture.home_team.name
+                ),
+                away_team_id=(
+                    fixture.away_team.id
+                ),
+                away_team_name=(
+                    fixture.away_team.name
+                ),
+                competition_code=(
+                    competition_code
+                ),
+                kickoff_utc=fixture.utc_date,
+            )
         )
+
+        if persistent_elo is not None:
+            elo = persistent_elo
+            elo_source = "database"
+        else:
+            elo = build_fixture_elo(
+                home_team_id=(
+                    fixture.home_team.id
+                ),
+                home_team_name=(
+                    fixture.home_team.name
+                ),
+                away_team_id=(
+                    fixture.away_team.id
+                ),
+                away_team_name=(
+                    fixture.away_team.name
+                ),
+                matches=[
+                    *home_matches,
+                    *away_matches,
+                ],
+                as_of=fixture.utc_date,
+                competition_code=(
+                    competition_code
+                ),
+            )
+
+            elo_source = "calculated"
 
         home_expected_goals = (
             estimate_expected_goals(
@@ -335,8 +383,12 @@ class FixtureAnalysisService:
         )
 
         confidence = calculate_confidence(
-            home_matches=home_form.matches_used,
-            away_matches=away_form.matches_used,
+            home_matches=(
+                home_form.matches_used
+            ),
+            away_matches=(
+                away_form.matches_used
+            ),
             probability_strength=(
                 strongest_probability
             ),
@@ -397,6 +449,7 @@ class FixtureAnalysisService:
                 away_statistics=(
                     away_statistics_source
                 ),
+                elo=elo_source,
             ),
             home_expected_goals=(
                 home_expected_goals
