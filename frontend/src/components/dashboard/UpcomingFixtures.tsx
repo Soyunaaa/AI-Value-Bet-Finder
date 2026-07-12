@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import type { FootballFixture } from "../../types/football";
+import { Link } from "react-router-dom";
 
 interface UpcomingFixturesProps {
   fixtures: FootballFixture[];
@@ -151,9 +152,9 @@ export default function UpcomingFixtures({
       ) : (
         <div className="divide-y divide-slate-700/70">
           {fixtures.slice(0, 8).map((fixture) => (
-            <button
-              key={fixture.id}
-              type="button"
+            <Link
+                 key={fixture.id}
+               to={`/fixture-analysis/${fixture.id}`}
               className="grid w-full grid-cols-[80px_1fr_auto] items-center gap-4 px-6 py-5 text-left transition hover:bg-slate-700/30"
             >
               <div>
@@ -217,7 +218,7 @@ export default function UpcomingFixtures({
                 size={20}
                 className="text-slate-500"
               />
-            </button>
+            </Link>
           ))}
         </div>
       )}

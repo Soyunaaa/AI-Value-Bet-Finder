@@ -7,15 +7,18 @@ import {
 
 import Analysis from "./pages/Analysis";
 import Dashboard from "./pages/Dashboard";
+import FixtureAnalysis from "./pages/FixtureAnalysis";
 import Live from "./pages/Live";
 import Statistics from "./pages/Statistics";
 import ValueBets from "./pages/ValueBets";
-
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Dashboard />} />
+        <Route
+          path="/"
+          element={<Dashboard />}
+        />
 
         <Route
           path="/live"
@@ -30,6 +33,11 @@ export default function App() {
         <Route
           path="/analysis/:id"
           element={<Analysis />}
+        />
+
+        <Route
+          path="/fixture-analysis/:fixtureId"
+          element={<FixtureAnalysis />}
         />
 
         <Route
