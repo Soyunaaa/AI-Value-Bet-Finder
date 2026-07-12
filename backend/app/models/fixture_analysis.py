@@ -1,9 +1,20 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
+from app.models.elo import FixtureEloSummary
 from app.models.football import FootballFixture
 from app.models.prediction import MatchPredictionResult
 from app.models.team_strength import TeamStrengthRating
-from app.models.elo import FixtureEloSummary
+
+
+DataSourceName = Literal[
+    "database",
+    "external_api",
+    "merged",
+    "calculated",
+]
+
 
 class TeamFormSummary(BaseModel):
     team_id: int
@@ -21,11 +32,23 @@ class TeamFormSummary(BaseModel):
     average_goals_conceded: float = Field(ge=0)
     points_per_game: float = Field(ge=0)
 
+
 class LeagueCalibrationSummary(BaseModel):
     competition_code: str
     goal_environment: float
     home_advantage_multiplier: float
     elo_home_advantage: float
+
+
+class AnalysisDataSources(BaseModel):
+    fixture: DataSourceName
+
+    home_history: DataSourceName
+    away_history: DataSourceName
+
+    home_statistics: DataSourceName
+    away_statistics: DataSourceName
+
 
 class FixtureAnalysisResult(BaseModel):
     fixture: FootballFixture
@@ -37,11 +60,14 @@ class FixtureAnalysisResult(BaseModel):
     away_strength: TeamStrengthRating
 
     elo: FixtureEloSummary
+
     league_calibration: LeagueCalibrationSummary
-    
+
+    data_sources: AnalysisDataSources
+
     home_expected_goals: float = Field(ge=0)
     away_expected_goals: float = Field(ge=0)
-  
+
     prediction: MatchPredictionResult
 
     confidence: float = Field(ge=0, le=100)

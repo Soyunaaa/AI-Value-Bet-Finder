@@ -4,9 +4,50 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models.team_statistics import (
     TeamStatisticsRecord,
 )
+from app.database.session import (
+    AsyncSessionFactory,
+)
 from app.models.database import (
     TeamStatisticsResponse,
 )
+from app.models.team_strength import (
+    TeamStrengthRating,
+)
+
+
+DEFAULT_GOALS_AVERAGE = 1.35
+MAX_RATING_GOALS = 3.0
+
+
+def clamp(
+    value: float,
+    minimum: float,
+    maximum: float,
+) -> float:
+    return max(
+        minimum,
+        min(value, maximum),
+    )
+
+
+def normalize_goal_rating(
+    goals: float,
+) -> float:
+    return clamp(
+        goals / MAX_RATING_GOALS * 100,
+        0,
+        100,
+    )
+
+
+def calculate_form_rating(
+    points_per_game: float,
+) -> float:
+    return clamp(
+        points_per_game / 3 * 100,
+        0,
+        100,
+    )
 
 
 def record_to_response(
@@ -59,6 +100,128 @@ def record_to_response(
             record.last_ten_form
         ),
     )
+
+
+def record_to_team_strength(
+    record: TeamStatisticsRecord,
+) -> TeamStrengthRating:
+    average_scored = (
+        record.average_goals_scored
+        or DEFAULT_GOALS_AVERAGE
+    )
+
+    average_conceded = (
+        record.average_goals_conceded
+        or DEFAULT_GOALS_AVERAGE
+    )
+
+    attack_rating = normalize_goal_rating(
+        average_scored
+    )
+
+    defence_rating = clamp(
+        100
+        - normalize_goal_rating(
+            average_conceded
+        ),
+        0,
+        100,
+    )
+
+    form_rating = calculate_form_rating(
+        record.points_per_game
+    )
+
+    overall_rating = (
+        attack_rating * 0.40
+        + defence_rating * 0.35
+        + form_rating * 0.25
+    )
+
+    return TeamStrengthRating(
+        team_id=record.team_id,
+        team_name=record.team_name,
+        matches_used=record.matches_played,
+        attack_rating=round(
+            attack_rating,
+            1,
+        ),
+        defence_rating=round(
+            defence_rating,
+            1,
+        ),
+        form_rating=round(
+            form_rating,
+            1,
+        ),
+        overall_rating=round(
+            overall_rating,
+            1,
+        ),
+        average_goals_scored=round(
+            average_scored,
+            3,
+        ),
+        average_goals_conceded=round(
+            average_conceded,
+            3,
+        ),
+        points_per_game=round(
+            record.points_per_game,
+            3,
+        ),
+        home_average_scored=round(
+            (
+                record.home_average_scored
+                or average_scored
+            ),
+            3,
+        ),
+        home_average_conceded=round(
+            (
+                record.home_average_conceded
+                or average_conceded
+            ),
+            3,
+        ),
+        away_average_scored=round(
+            (
+                record.away_average_scored
+                or average_scored
+            ),
+            3,
+        ),
+        away_average_conceded=round(
+            (
+                record.away_average_conceded
+                or average_conceded
+            ),
+            3,
+        ),
+    )
+
+
+async def get_team_statistics_record(
+    *,
+    team_id: int,
+    competition_code: str,
+) -> TeamStatisticsRecord | None:
+    async with AsyncSessionFactory() as session:
+        statement = (
+            select(TeamStatisticsRecord)
+            .where(
+                TeamStatisticsRecord.team_id
+                == team_id,
+                TeamStatisticsRecord.competition_code
+                == competition_code.upper(),
+            )
+        )
+
+        result = await session.execute(
+            statement
+        )
+
+        return result.scalar_one_or_none()
 
 
 async def get_competition_team_statistics(
