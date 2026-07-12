@@ -3,7 +3,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.calculations import router as calculations_router
 from app.api.value_bets import router as value_bets_router
 from app.api.predictions import router as predictions_router
-
+from app.api.football import router as football_router
+from app.api.fixture_analysis import (
+    router as fixture_analysis_router,
+)
+from app.api.automatic_fixture_value import (
+    router as automatic_fixture_value_router,
+)
+from app.api.market_evaluation import (
+    router as market_evaluation_router,
+)
+from app.api.fixture_value import (
+    router as fixture_value_router,
+)
+from app.api.odds import router as odds_router
 app = FastAPI(
     title="AI Value Bet Finder API",
     description="Backend API for football statistics and value-bet analysis.",
@@ -33,7 +46,30 @@ app.include_router(
     predictions_router,
     prefix="/api",
 )
-
+app.include_router(
+    football_router,
+    prefix="/api",
+)
+app.include_router(
+    fixture_analysis_router,
+    prefix="/api",
+)
+app.include_router(
+    market_evaluation_router,
+    prefix="/api",
+)
+app.include_router(
+    fixture_value_router,
+    prefix="/api",
+)
+app.include_router(
+    odds_router,
+    prefix="/api",
+)
+app.include_router(
+    automatic_fixture_value_router,
+    prefix="/api",
+)
 @app.get("/")
 def root() -> dict[str, str]:
     return {
