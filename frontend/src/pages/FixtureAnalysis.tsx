@@ -5,10 +5,13 @@ import {
   ArrowLeft,
   BarChart3,
   CheckCircle2,
+  CircleDollarSign,
   Clock3,
+  ExternalLink,
   Goal,
   LoaderCircle,
   RefreshCw,
+  Search,
   Shield,
   Sparkles,
   Target,
@@ -23,12 +26,30 @@ import {
 
 import DashboardLayout from "../components/layout/DashboardLayout";
 
+import { useAutomaticFixtureValue } from "../hooks/useAutomaticFixtureValue";
 import { useFixtureAnalysis } from "../hooks/useFixtureAnalysis";
+
+import type {
+  AutomaticFixtureValue,
+  PositiveValueSelection,
+} from "../types/automaticFixtureValue";
 
 import type {
   MarketProbability,
   TeamFormSummary,
+  TeamStrengthRating,
 } from "../types/fixtureAnalysis";
+
+
+const sportKeys: Record<string, string> = {
+  PL: "soccer_epl",
+  PD: "soccer_spain_la_liga",
+  BL1: "soccer_germany_bundesliga",
+  SA: "soccer_italy_serie_a",
+  FL1: "soccer_france_ligue_one",
+  CL: "soccer_uefa_champs_league",
+};
+
 
 function formatKickoff(utcDate: string) {
   return new Intl.DateTimeFormat(undefined, {
@@ -40,9 +61,11 @@ function formatKickoff(utcDate: string) {
   }).format(new Date(utcDate));
 }
 
+
 function formatPercentage(probability: number) {
   return `${(probability * 100).toFixed(1)}%`;
 }
+
 
 function getFormResultString(
   form: TeamFormSummary
@@ -55,6 +78,7 @@ function getFormResultString(
     .slice(0, form.matches_used)
     .join("");
 }
+
 
 export default function FixtureAnalysis() {
   const { fixtureId } = useParams();
@@ -69,6 +93,13 @@ export default function FixtureAnalysis() {
     refresh,
     retry,
   } = useFixtureAnalysis(parsedFixtureId);
+
+  const {
+    result: valueResult,
+    loading: valueLoading,
+    error: valueError,
+    scan: scanValue,
+  } = useAutomaticFixtureValue(parsedFixtureId);
 
   if (
     !Number.isInteger(parsedFixtureId) ||
@@ -142,8 +173,13 @@ export default function FixtureAnalysis() {
     fixture,
     home_form: homeForm,
     away_form: awayForm,
+    home_strength: homeStrength,
+    away_strength: awayStrength,
     prediction,
   } = analysis;
+
+  const sportKey =
+    sportKeys[fixture.competition.code];
 
   return (
     <DashboardLayout>
@@ -250,6 +286,26 @@ export default function FixtureAnalysis() {
           />
         </section>
 
+        <AutomaticValueSection
+          result={valueResult}
+          loading={valueLoading}
+          error={valueError}
+          sportKey={sportKey}
+          onScan={() => {
+            if (!sportKey) {
+              return;
+            }
+
+            void scanValue({
+              sportKey,
+              region: "eu",
+              bankroll: 1000,
+              kellyFraction: 0.25,
+              minimumExpectedValue: 0.05,
+            });
+          }}
+        />
+
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(340px,1fr)]">
           <div className="rounded-2xl border border-slate-700 bg-slate-800 p-6">
             <div className="flex items-center gap-2">
@@ -343,6 +399,20 @@ export default function FixtureAnalysis() {
           />
         </section>
 
+        <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <StrengthCard
+            title={`${fixture.home_team.name} Ratings`}
+            strength={homeStrength}
+            accent="bg-cyan-400"
+          />
+
+          <StrengthCard
+            title={`${fixture.away_team.name} Ratings`}
+            strength={awayStrength}
+            accent="bg-purple-400"
+          />
+        </section>
+
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
           <div className="rounded-2xl border border-slate-700 bg-slate-800 p-6">
             <div className="flex items-center gap-2">
@@ -424,10 +494,11 @@ export default function FixtureAnalysis() {
           </p>
 
           <p className="mt-2 text-sm leading-6 text-slate-400">
-            This analysis uses recent finished-match averages and
-            a Poisson score model. It does not yet account for
-            injuries, expected lineups, advanced xG, corners,
-            referee data, weather or live bookmaker odds.
+            This analysis uses recent finished-match averages,
+            weighted team strength and a Poisson score model.
+            It does not yet account for injuries, expected
+            lineups, advanced xG, corners, referee data or
+            weather.
           </p>
         </section>
       </div>
@@ -435,12 +506,14 @@ export default function FixtureAnalysis() {
   );
 }
 
+
 interface SummaryCardProps {
   title: string;
   value: string;
   icon: ReactNode;
   color: string;
 }
+
 
 function SummaryCard({
   title,
@@ -471,11 +544,13 @@ function SummaryCard({
   );
 }
 
+
 interface ProbabilityBarProps {
   label: string;
   market: MarketProbability;
   color: string;
 }
+
 
 function ProbabilityBar({
   label,
@@ -513,10 +588,12 @@ function ProbabilityBar({
   );
 }
 
+
 interface CompactMarketProps {
   label: string;
   market: MarketProbability;
 }
+
 
 function CompactMarket({
   label,
@@ -542,11 +619,13 @@ function CompactMarket({
   );
 }
 
+
 interface TeamFormCardProps {
   form: TeamFormSummary;
   heading: string;
   accent: string;
 }
+
 
 function TeamFormCard({
   form,
@@ -619,15 +698,446 @@ function TeamFormCard({
   );
 }
 
+
 interface FormMetricProps {
   label: string;
   value: string;
 }
 
+
 function FormMetric({
   label,
   value,
 }: FormMetricProps) {
+  return (
+    <div className="rounded-xl bg-slate-900/60 p-3">
+      <p className="text-xs text-slate-500">
+        {label}
+      </p>
+
+      <p className="mt-2 font-bold text-white">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+
+interface StrengthCardProps {
+  title: string;
+  strength: TeamStrengthRating;
+  accent: string;
+}
+
+
+function StrengthCard({
+  title,
+  strength,
+  accent,
+}: StrengthCardProps) {
+  return (
+    <section className="rounded-2xl border border-slate-700 bg-slate-800 p-6">
+      <h2 className="text-xl font-semibold text-white">
+        {title}
+      </h2>
+
+      <p className="mt-1 text-sm text-slate-400">
+        Weighted recent-performance ratings
+      </p>
+
+      <div className="mt-6 space-y-5">
+        <StrengthBar
+          label="Attack"
+          value={strength.attack_rating}
+          accent={accent}
+        />
+
+        <StrengthBar
+          label="Defence"
+          value={strength.defence_rating}
+          accent={accent}
+        />
+
+        <StrengthBar
+          label="Recent form"
+          value={strength.form_rating}
+          accent={accent}
+        />
+
+        <StrengthBar
+          label="Overall"
+          value={strength.overall_rating}
+          accent={accent}
+        />
+      </div>
+    </section>
+  );
+}
+
+
+interface StrengthBarProps {
+  label: string;
+  value: number;
+  accent: string;
+}
+
+
+function StrengthBar({
+  label,
+  value,
+  accent,
+}: StrengthBarProps) {
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-300">
+          {label}
+        </p>
+
+        <p className="font-bold text-white">
+          {value.toFixed(1)}
+        </p>
+      </div>
+
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-700">
+        <div
+          className={`h-full rounded-full ${accent}`}
+          style={{
+            width: `${Math.min(value, 100)}%`,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+
+interface AutomaticValueSectionProps {
+  result: AutomaticFixtureValue | null;
+  loading: boolean;
+  error: string | null;
+  sportKey: string | undefined;
+  onScan: () => void;
+}
+
+
+function AutomaticValueSection({
+  result,
+  loading,
+  error,
+  sportKey,
+  onScan,
+}: AutomaticValueSectionProps) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-green-500/20 bg-slate-800">
+      <div className="flex flex-col gap-4 border-b border-slate-700 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <CircleDollarSign
+              size={22}
+              className="text-green-400"
+            />
+
+            <h2 className="text-xl font-semibold text-white">
+              Live Value Scan
+            </h2>
+          </div>
+
+          <p className="mt-1 text-sm text-slate-400">
+            Compare generated probabilities with current
+            bookmaker prices
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onScan}
+          disabled={loading || !sportKey}
+          className="flex items-center justify-center gap-2 rounded-xl bg-green-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-green-400 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Search
+            size={17}
+            className={loading ? "animate-pulse" : ""}
+          />
+
+          {loading
+            ? "Scanning odds..."
+            : "Scan bookmaker odds"}
+        </button>
+      </div>
+
+      {!sportKey ? (
+        <div className="px-6 py-10 text-center">
+          <p className="font-medium text-white">
+            Competition not configured
+          </p>
+
+          <p className="mt-2 text-sm text-slate-400">
+            Add an Odds API sport key for this competition
+            before scanning.
+          </p>
+        </div>
+      ) : error ? (
+        <div className="border-l-4 border-red-400 bg-red-500/5 px-6 py-5">
+          <p className="font-medium text-red-400">
+            Unable to scan odds
+          </p>
+
+          <p className="mt-2 text-sm leading-6 text-slate-400">
+            {error}
+          </p>
+        </div>
+      ) : result ? (
+        <ValueScanResults result={result} />
+      ) : (
+        <div className="px-6 py-10 text-center">
+          <Search
+            size={34}
+            className="mx-auto text-slate-600"
+          />
+
+          <p className="mt-4 font-medium text-white">
+            Ready to scan
+          </p>
+
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">
+            This uses external API quota, so odds are only
+            requested after you press the scan button.
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+
+interface ValueScanResultsProps {
+  result: AutomaticFixtureValue;
+}
+
+
+function ValueScanResults({
+  result,
+}: ValueScanResultsProps) {
+  const selections =
+    result.evaluation.positive_value_selections;
+
+  return (
+    <div>
+      <div className="grid grid-cols-1 gap-4 border-b border-slate-700 px-6 py-5 sm:grid-cols-3">
+        <ScanMetric
+          label="Event match"
+          value={`${(
+            result.matched_event.match_score * 100
+          ).toFixed(1)}%`}
+        />
+
+        <ScanMetric
+          label="Prices evaluated"
+          value={result.evaluation.selections_evaluated.toString()}
+        />
+
+        <ScanMetric
+          label="Positive-EV bets"
+          value={result.evaluation.positive_value_count.toString()}
+        />
+      </div>
+
+      <div className="border-b border-slate-700 bg-slate-900/30 px-6 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Matched Odds Event
+            </p>
+
+            <p className="mt-1 font-medium text-white">
+              {result.matched_event.home_team} vs{" "}
+              {result.matched_event.away_team}
+            </p>
+          </div>
+
+          {result.odds_requests_remaining !== null && (
+            <p className="text-xs text-slate-500">
+              Odds requests remaining:{" "}
+              <span className="font-semibold text-cyan-400">
+                {result.odds_requests_remaining}
+              </span>
+            </p>
+          )}
+        </div>
+      </div>
+
+      {selections.length > 0 ? (
+        <div className="grid grid-cols-1 gap-5 p-6 xl:grid-cols-2">
+          {selections.map((selection) => (
+            <PositiveValueCard
+              key={`${selection.market}-${selection.selection}-${selection.bookmaker}`}
+              selection={selection}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="px-6 py-12 text-center">
+          <CircleDollarSign
+            size={38}
+            className="mx-auto text-slate-600"
+          />
+
+          <h3 className="mt-4 text-lg font-semibold text-white">
+            No value above the threshold
+          </h3>
+
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">
+            None of the best available 1X2 prices produced
+            at least{" "}
+            {(
+              result.evaluation.minimum_expected_value *
+              100
+            ).toFixed(1)}
+            % expected value.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+interface ScanMetricProps {
+  label: string;
+  value: string;
+}
+
+
+function ScanMetric({
+  label,
+  value,
+}: ScanMetricProps) {
+  return (
+    <div className="rounded-xl bg-slate-900/60 p-4">
+      <p className="text-xs uppercase tracking-wider text-slate-500">
+        {label}
+      </p>
+
+      <p className="mt-2 text-xl font-bold text-white">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+
+interface PositiveValueCardProps {
+  selection: PositiveValueSelection;
+}
+
+
+function PositiveValueCard({
+  selection,
+}: PositiveValueCardProps) {
+  return (
+    <article className="rounded-2xl border border-green-500/20 bg-green-500/5 p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-green-400">
+            Positive value detected
+          </p>
+
+          <h3 className="mt-2 text-xl font-bold text-white">
+            {selection.selection}
+          </h3>
+
+          <p className="mt-1 text-sm text-slate-400">
+            {selection.market}
+          </p>
+        </div>
+
+        <div className="rounded-xl bg-green-500/10 px-3 py-2 text-right">
+          <p className="text-xs text-green-400">
+            Expected value
+          </p>
+
+          <p className="mt-1 text-xl font-bold text-green-400">
+            +{(
+              selection.expected_value * 100
+            ).toFixed(1)}
+            %
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <ValueMetric
+          label="Best odds"
+          value={selection.bookmaker_odds.toFixed(2)}
+        />
+
+        <ValueMetric
+          label="Fair odds"
+          value={selection.fair_odds.toFixed(2)}
+        />
+
+        <ValueMetric
+          label="Model"
+          value={`${(
+            selection.model_probability * 100
+          ).toFixed(1)}%`}
+        />
+
+        <ValueMetric
+          label="Edge"
+          value={`+${(
+            selection.probability_edge * 100
+          ).toFixed(1)}%`}
+        />
+      </div>
+
+      <div className="mt-5 flex flex-col gap-4 rounded-xl bg-slate-900/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs text-slate-500">
+            Best bookmaker
+          </p>
+
+          <p className="mt-1 font-semibold text-white">
+            {selection.bookmaker}
+          </p>
+        </div>
+
+        <div className="text-left sm:text-right">
+          <p className="text-xs text-slate-500">
+            Quarter-Kelly stake
+          </p>
+
+          <p className="mt-1 font-bold text-cyan-400">
+            {selection.recommended_stake.toFixed(2)}u
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-start gap-2 text-xs leading-5 text-slate-500">
+        <ExternalLink
+          size={14}
+          className="mt-0.5 shrink-0"
+        />
+
+        Odds are displayed for analysis only. This is not
+        a recommendation to place a wager.
+      </div>
+    </article>
+  );
+}
+
+
+interface ValueMetricProps {
+  label: string;
+  value: string;
+}
+
+
+function ValueMetric({
+  label,
+  value,
+}: ValueMetricProps) {
   return (
     <div className="rounded-xl bg-slate-900/60 p-3">
       <p className="text-xs text-slate-500">

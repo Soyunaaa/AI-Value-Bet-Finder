@@ -50,11 +50,35 @@ export interface TeamFormSummary {
   points_per_game: number;
 }
 
+export interface TeamStrengthRating {
+  team_id: number;
+  team_name: string;
+  matches_used: number;
+
+  attack_rating: number;
+  defence_rating: number;
+  form_rating: number;
+  overall_rating: number;
+
+  average_goals_scored: number;
+  average_goals_conceded: number;
+  points_per_game: number;
+
+  home_average_scored: number;
+  home_average_conceded: number;
+
+  away_average_scored: number;
+  away_average_conceded: number;
+}
+
 export interface FixtureAnalysis {
   fixture: FootballFixture;
 
   home_form: TeamFormSummary;
   away_form: TeamFormSummary;
+
+  home_strength: TeamStrengthRating;
+  away_strength: TeamStrengthRating;
 
   home_expected_goals: number;
   away_expected_goals: number;
