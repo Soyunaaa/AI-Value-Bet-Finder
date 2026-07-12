@@ -4,12 +4,13 @@ from app.models.fixture_analysis import (
     TeamFormSummary,
 )
 from app.models.football import FootballFixture
-from app.models.prediction import MatchPredictionRequest
-
-from app.providers.football_data import (
-    FootballDataOrgProvider,
+from app.models.prediction import (
+    MatchPredictionRequest,
 )
 
+from app.services.fixture_data_service import (
+    FixtureDataService,
+)
 from app.services.prediction.confidence import (
     calculate_confidence,
 )
@@ -54,7 +55,10 @@ def summarize_team_form(
         home_score = match.full_time.home
         away_score = match.full_time.away
 
-        if home_score is None or away_score is None:
+        if (
+            home_score is None
+            or away_score is None
+        ):
             continue
 
         team_is_home = (
@@ -65,7 +69,10 @@ def summarize_team_form(
             match.away_team.id == team_id
         )
 
-        if not team_is_home and not team_is_away:
+        if (
+            not team_is_home
+            and not team_is_away
+        ):
             continue
 
         if team_is_home:
@@ -129,28 +136,30 @@ def summarize_team_form(
 
 class FixtureAnalysisService:
     def __init__(self) -> None:
-        self.provider = FootballDataOrgProvider()
+        self.fixture_data = FixtureDataService()
 
     async def analyse_fixture(
         self,
         fixture_id: int,
     ) -> FixtureAnalysisResult:
-        fixture = await self.provider.get_match(
+        fixture = await self.fixture_data.get_fixture(
             fixture_id
         )
 
         home_matches = (
-            await self.provider.get_team_matches(
-                fixture.home_team.id,
-                status="FINISHED",
+            await self.fixture_data
+            .get_team_history(
+                team_id=fixture.home_team.id,
+                before_fixture=fixture,
                 limit=RECENT_MATCH_LIMIT,
             )
         )
 
         away_matches = (
-            await self.provider.get_team_matches(
-                fixture.away_team.id,
-                status="FINISHED",
+            await self.fixture_data
+            .get_team_history(
+                team_id=fixture.away_team.id,
+                before_fixture=fixture,
                 limit=RECENT_MATCH_LIMIT,
             )
         )
@@ -205,10 +214,12 @@ class FixtureAnalysisService:
                 attacking_team=home_strength,
                 defending_team=away_strength,
                 venue_attack_average=(
-                    home_strength.home_average_scored
+                    home_strength
+                    .home_average_scored
                 ),
                 opponent_venue_conceding_average=(
-                    away_strength.away_average_conceded
+                    away_strength
+                    .away_average_conceded
                 ),
                 home_advantage=True,
                 elo_difference=(
@@ -225,10 +236,12 @@ class FixtureAnalysisService:
                 attacking_team=away_strength,
                 defending_team=home_strength,
                 venue_attack_average=(
-                    away_strength.away_average_scored
+                    away_strength
+                    .away_average_scored
                 ),
                 opponent_venue_conceding_average=(
-                    home_strength.home_average_conceded
+                    home_strength
+                    .home_average_conceded
                 ),
                 home_advantage=False,
                 elo_difference=(
