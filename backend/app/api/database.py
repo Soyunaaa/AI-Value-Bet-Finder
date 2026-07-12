@@ -1,3 +1,4 @@
+from sqlalchemy import func, select
 from datetime import date
 
 from fastapi import (
@@ -17,6 +18,8 @@ from app.database.session import (
 from app.models.database import (
     DatabaseStatus,
     FixtureSyncResult,
+    TeamStatisticsBuildResult,
+    TeamStatisticsResponse,
 )
 from app.providers.football_data import (
     FootballDataApiError,
@@ -27,6 +30,13 @@ from app.services.database_service import (
 from app.services.fixture_sync_service import (
     FixtureSyncService,
     get_fixture_sync_service,
+)
+from app.services.team_statistics_builder import (
+    TeamStatisticsBuilder,
+    get_team_statistics_builder,
+)
+from app.services.team_statistics_service import (
+    get_competition_team_statistics,
 )
 
 
@@ -114,3 +124,89 @@ async def sync_competition_fixtures(
                 "failed."
             ),
         ) from exc
+
+
+@router.post(
+    "/statistics/rebuild/{competition_code}",
+    response_model=TeamStatisticsBuildResult,
+)
+async def rebuild_team_statistics(
+    competition_code: str,
+    session: AsyncSession = Depends(
+        get_database_session
+    ),
+    builder: TeamStatisticsBuilder = Depends(
+        get_team_statistics_builder
+    ),
+) -> TeamStatisticsBuildResult:
+    try:
+        return await builder.rebuild_competition(
+            session=session,
+            competition_code=competition_code,
+        )
+
+    except SQLAlchemyError as exc:
+        await session.rollback()
+
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Team statistics rebuild failed."
+            ),
+        ) from exc
+
+
+@router.get(
+    "/statistics/{competition_code}",
+    response_model=list[
+        TeamStatisticsResponse
+    ],
+)
+async def read_team_statistics(
+    competition_code: str,
+    session: AsyncSession = Depends(
+        get_database_session
+    ),
+) -> list[TeamStatisticsResponse]:
+    try:
+        return await get_competition_team_statistics(
+            session=session,
+            competition_code=competition_code,
+        )
+
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Unable to read team statistics."
+            ),
+        ) from exc
+        from sqlalchemy import func, select
+
+from app.database.models.match import MatchRecord
+
+
+@router.get("/debug/match-statuses")
+async def debug_match_statuses(
+    session: AsyncSession = Depends(
+        get_database_session
+    ),
+) -> list[dict[str, int | str]]:
+    statement = (
+        select(
+            MatchRecord.status,
+            func.count(MatchRecord.id),
+        )
+        .group_by(MatchRecord.status)
+        .order_by(MatchRecord.status)
+    )
+
+    result = await session.execute(statement)
+
+    return [
+        {
+            "status": status,
+            "count": count,
+        }
+        for status, count in result.all()
+    ]

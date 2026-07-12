@@ -60,6 +60,7 @@ async def initialize_database() -> None:
     # Import ORM models before create_all so SQLAlchemy
     # knows which tables need to be created.
     from app.database.models import match  # noqa: F401
+    from app.database.models import team_statistics  # noqa: F401
 
     async with engine.begin() as connection:
         await connection.run_sync(

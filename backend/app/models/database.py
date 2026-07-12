@@ -7,6 +7,15 @@ class DatabaseStatus(BaseModel):
     matches_stored: int
 
 
+class TeamStatisticsBuildResult(BaseModel):
+    competition_code: str
+
+    matches_processed: int = Field(ge=0)
+    teams_created: int = Field(ge=0)
+    teams_updated: int = Field(ge=0)
+    teams_total: int = Field(ge=0)
+
+
 class FixtureSyncResult(BaseModel):
     competition_code: str
 
@@ -16,3 +25,36 @@ class FixtureSyncResult(BaseModel):
     fixtures_unchanged: int = Field(ge=0)
 
     total_matches_stored: int = Field(ge=0)
+
+    statistics_rebuilt: bool
+    statistics: TeamStatisticsBuildResult | None = None
+
+
+class TeamStatisticsResponse(BaseModel):
+    team_id: int
+    team_name: str
+
+    competition_code: str
+    competition_name: str
+
+    matches_played: int
+
+    wins: int
+    draws: int
+    losses: int
+
+    goals_scored: int
+    goals_conceded: int
+
+    points_per_game: float
+    average_goals_scored: float
+    average_goals_conceded: float
+
+    home_average_scored: float
+    home_average_conceded: float
+
+    away_average_scored: float
+    away_average_conceded: float
+
+    last_five_form: str
+    last_ten_form: str
