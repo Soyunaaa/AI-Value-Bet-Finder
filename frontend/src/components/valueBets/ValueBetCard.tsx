@@ -27,13 +27,13 @@ export default function ValueBetCard({
 }: ValueBetCardProps) {
   const stars = getStars(bet.confidence);
 
-  const modelProbability = Math.round(
-    (1 / bet.fairOdds) * 100
-  );
+ const modelProbability = Math.round(
+  bet.modelProbability * 100
+);
 
-  const bookmakerProbability = Math.round(
-    (1 / bet.odds) * 100
-  );
+const bookmakerProbability = Math.round(
+  bet.impliedProbability * 100
+);
 
   return (
     <article className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 transition duration-200 hover:-translate-y-1 hover:border-cyan-500/60">

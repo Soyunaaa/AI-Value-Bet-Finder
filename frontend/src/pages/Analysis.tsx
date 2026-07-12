@@ -124,11 +124,14 @@ export default function Analysis() {
     );
   }
 
-  const modelProbability = (1 / bet.fairOdds) * 100;
-  const marketProbability = (1 / bet.odds) * 100;
+  const modelProbability =
+  bet.modelProbability * 100;
 
-  const probabilityEdge =
-    modelProbability - marketProbability;
+const marketProbability =
+  bet.impliedProbability * 100;
+
+const probabilityEdge =
+  bet.probabilityEdge * 100;
 
   const sortedBookmakers = [...bet.bookmakerOdds].sort(
     (first, second) => second.odds - first.odds
@@ -343,7 +346,52 @@ export default function Analysis() {
             value={bet.weather}
           />
         </section>
+<section className="rounded-2xl border border-purple-500/20 bg-purple-500/5 p-6">
+  <div className="flex items-center gap-2">
+    <Brain size={21} className="text-purple-400" />
 
+    <div>
+      <h2 className="text-xl font-semibold text-white">
+        Kelly Stake Calculator
+      </h2>
+
+      <p className="mt-1 text-sm text-slate-400">
+        Calculated using a 1,000-unit bankroll and quarter-Kelly
+        staking.
+      </p>
+    </div>
+  </div>
+
+  <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <MainMetric
+      label="Full Kelly"
+      value={`${(
+        bet.fullKellyFraction * 100
+      ).toFixed(1)}%`}
+      color="text-purple-400"
+    />
+
+    <MainMetric
+      label="Quarter Kelly"
+      value={`${(
+        bet.recommendedKellyFraction * 100
+      ).toFixed(1)}%`}
+      color="text-cyan-400"
+    />
+
+    <MainMetric
+      label="Suggested Stake"
+      value={`${bet.recommendedStake.toFixed(2)}u`}
+      color="text-green-400"
+    />
+  </div>
+
+  <p className="mt-5 text-xs leading-5 text-slate-500">
+    Kelly staking can produce large and volatile stakes when model
+    probabilities are inaccurate. The displayed amount is for
+    demonstration only.
+  </p>
+</section>
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
           <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800">
             <div className="border-b border-slate-700 px-6 py-5">

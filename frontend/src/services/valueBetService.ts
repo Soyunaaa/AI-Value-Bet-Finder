@@ -3,7 +3,9 @@ import type { ApiValueBet } from "../types/api";
 
 import { apiRequest } from "./api";
 
-function mapApiValueBet(bet: ApiValueBet): ValueBet {
+function mapApiValueBet(
+  bet: ApiValueBet
+): ValueBet {
   return {
     id: bet.id,
     match: bet.match,
@@ -16,9 +18,20 @@ function mapApiValueBet(bet: ApiValueBet): ValueBet {
     bookmaker: bet.bookmaker,
 
     odds: bet.odds,
+    modelProbability: bet.model_probability,
+    impliedProbability: bet.implied_probability,
+    probabilityEdge: bet.probability_edge,
     fairOdds: bet.fair_odds,
-    ev: bet.expected_value,
+
+    // Backend decimal converted into a displayed percentage.
+    ev: bet.expected_value * 100,
+
     confidence: bet.confidence,
+
+    fullKellyFraction: bet.full_kelly_fraction,
+    recommendedKellyFraction:
+      bet.recommended_kelly_fraction,
+    recommendedStake: bet.recommended_stake,
 
     attackRating: bet.attack_rating,
     defenceRating: bet.defence_rating,
@@ -36,15 +49,21 @@ function mapApiValueBet(bet: ApiValueBet): ValueBet {
 
     reasons: bet.reasons,
 
-    bookmakerOdds: bet.bookmaker_odds.map((bookmaker) => ({
-      name: bookmaker.name,
-      odds: bookmaker.odds,
-    })),
+    bookmakerOdds: bet.bookmaker_odds.map(
+      (bookmaker) => ({
+        name: bookmaker.name,
+        odds: bookmaker.odds,
+      })
+    ),
   };
 }
 
-export async function getValueBets(): Promise<ValueBet[]> {
-  const response = await apiRequest<ApiValueBet[]>("/value-bets");
+export async function getValueBets(): Promise<
+  ValueBet[]
+> {
+  const response = await apiRequest<ApiValueBet[]>(
+    "/value-bets"
+  );
 
   return response.map(mapApiValueBet);
 }

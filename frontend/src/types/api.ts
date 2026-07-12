@@ -15,9 +15,16 @@ export interface ApiValueBet {
   bookmaker: string;
 
   odds: number;
+  model_probability: number;
+  implied_probability: number;
+  probability_edge: number;
   fair_odds: number;
   expected_value: number;
   confidence: number;
+
+  full_kelly_fraction: number;
+  recommended_kelly_fraction: number;
+  recommended_stake: number;
 
   attack_rating: number;
   defence_rating: number;
