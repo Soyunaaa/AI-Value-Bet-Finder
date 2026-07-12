@@ -1,9 +1,13 @@
+import type { ReactNode } from "react";
+
 import {
+  AlertCircle,
   ArrowLeft,
   Brain,
   CheckCircle2,
   CloudSun,
   Goal,
+  LoaderCircle,
   ShieldCheck,
   Sparkles,
   Target,
@@ -16,24 +20,119 @@ import {
   useParams,
 } from "react-router-dom";
 
+import {
+  useEffect,
+  useState,
+} from "react";
+
 import DashboardLayout from "../components/layout/DashboardLayout";
-import { valueBets } from "../data/valueBets";
+
+import type { ValueBet } from "../data/valueBets";
+
+import { getValueBet } from "../services/valueBetService";
 
 export default function Analysis() {
   const { id } = useParams();
 
-  const bet = valueBets.find(
-    (item) => item.id === Number(id)
-  );
+  const betId = Number(id);
 
-  if (!bet) {
+  const [bet, setBet] = useState<ValueBet | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!Number.isInteger(betId) || betId <= 0) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+
+    async function loadBet() {
+      try {
+        const result = await getValueBet(betId);
+        setBet(result);
+      } catch (requestError) {
+        const message =
+          requestError instanceof Error
+            ? requestError.message
+            : "Unable to load analysis.";
+
+        if (message === "Value bet not found") {
+          setNotFound(true);
+        } else {
+          setError(message);
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    void loadBet();
+  }, [betId]);
+
+  if (notFound) {
     return <Navigate to="/value-bets" replace />;
+  }
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="rounded-2xl border border-slate-700 bg-slate-800 p-16 text-center">
+          <LoaderCircle
+            size={40}
+            className="mx-auto animate-spin text-cyan-400"
+          />
+
+          <h1 className="mt-5 text-xl font-semibold text-white">
+            Loading analysis
+          </h1>
+
+          <p className="mt-2 text-sm text-slate-400">
+            Requesting model data from FastAPI.
+          </p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error || !bet) {
+    return (
+      <DashboardLayout>
+        <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-12 text-center">
+          <AlertCircle
+            size={40}
+            className="mx-auto text-red-400"
+          />
+
+          <h1 className="mt-5 text-xl font-semibold text-white">
+            Unable to load analysis
+          </h1>
+
+          <p className="mt-2 text-sm text-slate-400">
+            {error ?? "No analysis data was returned."}
+          </p>
+
+          <Link
+            to="/value-bets"
+            className="mt-6 inline-flex rounded-xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400"
+          >
+            Return to value bets
+          </Link>
+        </div>
+      </DashboardLayout>
+    );
   }
 
   const modelProbability = (1 / bet.fairOdds) * 100;
   const marketProbability = (1 / bet.odds) * 100;
+
   const probabilityEdge =
     modelProbability - marketProbability;
+
+  const sortedBookmakers = [...bet.bookmakerOdds].sort(
+    (first, second) => second.odds - first.odds
+  );
 
   return (
     <DashboardLayout>
@@ -253,38 +352,33 @@ export default function Analysis() {
               </h2>
 
               <p className="mt-1 text-sm text-slate-400">
-                Demonstration odds from several bookmakers
+                Odds returned by the backend
               </p>
             </div>
 
             <div className="divide-y divide-slate-700/70">
-              {bet.bookmakerOdds
-                .sort(
-                  (first, second) =>
-                    second.odds - first.odds
-                )
-                .map((bookmaker, index) => (
-                  <div
-                    key={bookmaker.name}
-                    className="flex items-center justify-between px-6 py-4"
-                  >
-                    <div>
-                      <p className="font-semibold text-white">
-                        {bookmaker.name}
-                      </p>
-
-                      {index === 0 && (
-                        <p className="mt-1 text-xs font-medium text-green-400">
-                          Best available price
-                        </p>
-                      )}
-                    </div>
-
-                    <p className="text-xl font-bold text-white">
-                      {bookmaker.odds.toFixed(2)}
+              {sortedBookmakers.map((bookmaker, index) => (
+                <div
+                  key={bookmaker.name}
+                  className="flex items-center justify-between px-6 py-4"
+                >
+                  <div>
+                    <p className="font-semibold text-white">
+                      {bookmaker.name}
                     </p>
+
+                    {index === 0 && (
+                      <p className="mt-1 text-xs font-medium text-green-400">
+                        Best available price
+                      </p>
+                    )}
                   </div>
-                ))}
+
+                  <p className="text-xl font-bold text-white">
+                    {bookmaker.odds.toFixed(2)}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -310,8 +404,8 @@ export default function Analysis() {
               />
 
               <DetailRow
-                label="Data status"
-                value="Demonstration"
+                label="Data source"
+                value="FastAPI backend"
               />
             </div>
           </div>
@@ -323,9 +417,9 @@ export default function Analysis() {
           </p>
 
           <p className="mt-2 text-sm leading-6 text-slate-400">
-            These statistics, probabilities and odds are placeholder
-            data. They are not live betting information or financial
-            advice.
+            The frontend now loads this analysis from FastAPI, but
+            the backend values are still placeholders. They are not
+            live betting information or betting advice.
           </p>
         </section>
       </div>
@@ -346,7 +440,9 @@ function MainMetric({
 }: MainMetricProps) {
   return (
     <div className="rounded-xl bg-slate-900/60 p-4">
-      <p className="text-sm text-slate-400">{label}</p>
+      <p className="text-sm text-slate-400">
+        {label}
+      </p>
 
       <p className={`mt-2 text-2xl font-bold ${color}`}>
         {value}
@@ -369,7 +465,9 @@ function ProbabilityRow({
   return (
     <div>
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-400">{label}</p>
+        <p className="text-sm text-slate-400">
+          {label}
+        </p>
 
         <p className="font-bold text-white">
           {value.toFixed(1)}%
@@ -398,9 +496,13 @@ function RatingBar({
   return (
     <div>
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-300">{label}</p>
+        <p className="text-sm text-slate-300">
+          {label}
+        </p>
 
-        <p className="font-semibold text-white">{value}%</p>
+        <p className="font-semibold text-white">
+          {value}%
+        </p>
       </div>
 
       <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-700">
@@ -414,7 +516,7 @@ function RatingBar({
 }
 
 interface InfoCardProps {
-  icon: React.ReactNode;
+  icon: ReactNode;
   title: string;
   value: string;
 }
@@ -428,7 +530,9 @@ function InfoCard({
     <div className="rounded-2xl border border-slate-700 bg-slate-800 p-5">
       <div className="text-cyan-400">{icon}</div>
 
-      <p className="mt-4 text-sm text-slate-400">{title}</p>
+      <p className="mt-4 text-sm text-slate-400">
+        {title}
+      </p>
 
       <p className="mt-2 text-xl font-bold text-white">
         {value}
