@@ -17,6 +17,8 @@ from app.models.database import (
     EloBuildResult,
     EloHistoryResponse,
     FixtureSyncResult,
+    LeagueStatisticsBuildResult,
+    LeagueStatisticsResponse,
     TeamEloResponse,
     TeamStatisticsBuildResult,
     TeamStatisticsResponse,
@@ -26,6 +28,10 @@ from app.services.database_service import get_database_status
 from app.services.fixture_sync_service import (
     FixtureSyncService,
     get_fixture_sync_service,
+)
+from app.services.league_statistics_service import (
+    LeagueStatisticsService,
+    get_league_statistics_service,
 )
 from app.services.persistent_elo_service import (
     PersistentEloService,
@@ -59,6 +65,7 @@ async def database_status(
         return await get_database_status(
             session
         )
+
     except SQLAlchemyError as exc:
         raise HTTPException(
             status_code=503,
@@ -156,9 +163,7 @@ async def rebuild_team_statistics(
 
 @router.get(
     "/statistics/{competition_code}",
-    response_model=list[
-        TeamStatisticsResponse
-    ],
+    response_model=list[TeamStatisticsResponse],
 )
 async def read_team_statistics(
     competition_code: str,
@@ -245,9 +250,7 @@ async def rebuild_competition_elo(
 
 @router.get(
     "/elo/{competition_code}",
-    response_model=list[
-        TeamEloResponse
-    ],
+    response_model=list[TeamEloResponse],
 )
 async def read_competition_elo(
     competition_code: str,
@@ -273,9 +276,7 @@ async def read_competition_elo(
 
 @router.get(
     "/elo/{competition_code}/{team_id}/history",
-    response_model=list[
-        EloHistoryResponse
-    ],
+    response_model=list[EloHistoryResponse],
 )
 async def read_team_elo_history(
     competition_code: str,
@@ -298,4 +299,64 @@ async def read_team_elo_history(
         raise HTTPException(
             status_code=503,
             detail="Unable to read Elo history.",
+        ) from exc
+
+
+@router.post(
+    "/league-statistics/rebuild/{competition_code}",
+    response_model=LeagueStatisticsBuildResult,
+)
+async def rebuild_league_statistics(
+    competition_code: str,
+    session: AsyncSession = Depends(
+        get_database_session
+    ),
+    service: LeagueStatisticsService = Depends(
+        get_league_statistics_service
+    ),
+) -> LeagueStatisticsBuildResult:
+    try:
+        return await service.rebuild_competition(
+            session=session,
+            competition_code=competition_code,
+        )
+
+    except SQLAlchemyError as exc:
+        await session.rollback()
+
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "League statistics rebuild failed."
+            ),
+        ) from exc
+
+
+@router.get(
+    "/league-statistics/{competition_code}",
+    response_model=(
+        LeagueStatisticsResponse | None
+    ),
+)
+async def read_league_statistics(
+    competition_code: str,
+    session: AsyncSession = Depends(
+        get_database_session
+    ),
+    service: LeagueStatisticsService = Depends(
+        get_league_statistics_service
+    ),
+) -> LeagueStatisticsResponse | None:
+    try:
+        return await service.get_competition_statistics(
+            session=session,
+            competition_code=competition_code,
+        )
+
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Unable to read league statistics."
+            ),
         ) from exc

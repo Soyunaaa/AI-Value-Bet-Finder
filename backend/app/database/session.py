@@ -58,6 +58,7 @@ AsyncSessionFactory = async_sessionmaker(
 
 async def initialize_database() -> None:
     from app.database.models import elo  # noqa: F401
+    from app.database.models import league_statistics  # noqa: F401
     from app.database.models import match  # noqa: F401
     from app.database.models import team_statistics  # noqa: F401
 

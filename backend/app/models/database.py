@@ -100,3 +100,31 @@ class EloHistoryResponse(BaseModel):
     rating_before: float
     rating_after: float
     rating_change: float
+
+
+class LeagueStatisticsBuildResult(BaseModel):
+    competition_code: str
+    matches_processed: int = Field(ge=0)
+    statistics_created: bool
+
+
+class LeagueStatisticsResponse(BaseModel):
+    competition_code: str
+    competition_name: str
+
+    matches_played: int
+
+    average_goals: float
+    average_home_goals: float
+    average_away_goals: float
+
+    home_win_rate: float
+    draw_rate: float
+    away_win_rate: float
+
+    over_2_5_rate: float
+    btts_rate: float
+
+    goal_environment: float
+    home_advantage_multiplier: float
+    elo_home_advantage: float
