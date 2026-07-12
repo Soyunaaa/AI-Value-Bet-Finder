@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     )
     odds_api_default_region: str = "eu"
 
+    database_url: str = (
+        "sqlite+aiosqlite:///./database/value_bet_finder.db"
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

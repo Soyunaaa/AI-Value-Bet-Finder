@@ -3,3 +3,5 @@ pydantic-settings
 pytest
 httpx
 pytest-asyncio
+sqlalchemy
+aiosqlite
