@@ -38,6 +38,30 @@ class NoUsableOddsError(RuntimeError):
     pass
 
 
+BestPriceMap = dict[
+    tuple[str, str],
+    tuple[str, float],
+]
+
+
+def save_best_price(
+    *,
+    prices: BestPriceMap,
+    market: str,
+    selection: str,
+    bookmaker: str,
+    price: float,
+) -> None:
+    key = (market, selection)
+    existing = prices.get(key)
+
+    if existing is None or price > existing[1]:
+        prices[key] = (
+            bookmaker,
+            price,
+        )
+
+
 def classify_h2h_outcome(
     *,
     outcome_name: str,
@@ -75,39 +99,74 @@ def classify_h2h_outcome(
     return None
 
 
-def extract_best_h2h_prices(
+def extract_best_market_prices(
     event: OddsEvent,
-) -> dict[str, tuple[str, float]]:
-    best_prices: dict[
-        str,
-        tuple[str, float],
-    ] = {}
+) -> BestPriceMap:
+    best_prices: BestPriceMap = {}
 
     for bookmaker in event.bookmakers:
         for market in bookmaker.markets:
-            if market.key != "h2h":
-                continue
+            if market.key == "h2h":
+                for outcome in market.outcomes:
+                    selection = classify_h2h_outcome(
+                        outcome_name=outcome.name,
+                        event=event,
+                    )
 
-            for outcome in market.outcomes:
-                selection = classify_h2h_outcome(
-                    outcome_name=outcome.name,
-                    event=event,
-                )
+                    if selection is None:
+                        continue
 
-                if selection is None:
-                    continue
+                    save_best_price(
+                        prices=best_prices,
+                        market="1X2",
+                        selection=selection,
+                        bookmaker=bookmaker.title,
+                        price=outcome.price,
+                    )
 
-                existing = best_prices.get(
-                    selection
-                )
+            elif market.key == "totals":
+                for outcome in market.outcomes:
+                    if outcome.point != 2.5:
+                        continue
 
-                if (
-                    existing is None
-                    or outcome.price > existing[1]
-                ):
-                    best_prices[selection] = (
-                        bookmaker.title,
-                        outcome.price,
+                    normalized_name = (
+                        outcome.name.strip().lower()
+                    )
+
+                    if normalized_name == "over":
+                        selection = "Over 2.5"
+                    elif normalized_name == "under":
+                        selection = "Under 2.5"
+                    else:
+                        continue
+
+                    save_best_price(
+                        prices=best_prices,
+                        market="Goals",
+                        selection=selection,
+                        bookmaker=bookmaker.title,
+                        price=outcome.price,
+                    )
+
+            elif market.key == "btts":
+                for outcome in market.outcomes:
+                    normalized_name = (
+                        outcome.name.strip().lower()
+                    )
+
+                    if normalized_name == "yes":
+                        selection = "Yes"
+                    elif normalized_name == "no":
+                        selection = "No"
+                    else:
+                        continue
+
+                    save_best_price(
+                        prices=best_prices,
+                        market="BTTS",
+                        selection=selection,
+                        bookmaker=bookmaker.title,
+                        price=outcome.price,
                     )
 
     return best_prices
@@ -136,7 +195,8 @@ class AutomaticFixtureValueService:
             .analyse_fixture(fixture_id)
         )
 
-        odds_response = (
+        # First request: obtain events for fixture matching.
+        event_list_response = (
             await self.odds_service.get_odds(
                 sport_key=sport_key,
                 regions=[region],
@@ -146,7 +206,7 @@ class AutomaticFixtureValueService:
 
         match = find_best_odds_event(
             fixture=analysis.fixture,
-            events=odds_response.events,
+            events=event_list_response.events,
         )
 
         if match is None:
@@ -155,63 +215,85 @@ class AutomaticFixtureValueService:
                 "could be matched to this fixture."
             )
 
-        odds_event, match_score = match
+        matched_event, match_score = match
 
-        best_prices = extract_best_h2h_prices(
+        # Second request: fetch all supported markets for
+        # the single matched event.
+        event_odds_response = (
+            await self.odds_service.get_event_odds(
+                sport_key=sport_key,
+                event_id=matched_event.id,
+                regions=[region],
+                markets=[
+                    "h2h",
+                    "totals",
+                    "btts",
+                ],
+            )
+        )
+
+        odds_event = event_odds_response.event
+
+        best_prices = extract_best_market_prices(
             odds_event
         )
 
-        required_selections = {
-            "Home Win",
-            "Draw",
-            "Away Win",
-        }
-
-        missing_selections = (
-            required_selections
-            - set(best_prices)
-        )
-
-        if missing_selections:
+        if not best_prices:
             raise NoUsableOddsError(
-                "The matched event did not contain "
-                "complete 1X2 prices. Missing: "
-                + ", ".join(
-                    sorted(missing_selections)
-                )
+                "The matched event did not contain usable "
+                "1X2, Over/Under 2.5 or BTTS prices."
             )
 
         selections: list[
             MarketSelectionInput
         ] = []
 
-        for selection_name in [
-            "Home Win",
-            "Draw",
-            "Away Win",
-        ]:
+        selection_order = [
+            ("1X2", "Home Win"),
+            ("1X2", "Draw"),
+            ("1X2", "Away Win"),
+            ("Goals", "Over 2.5"),
+            ("Goals", "Under 2.5"),
+            ("BTTS", "Yes"),
+            ("BTTS", "No"),
+        ]
+
+        for market, selection in selection_order:
+            price_data = best_prices.get(
+                (market, selection)
+            )
+
+            # Markets that are unavailable are skipped rather
+            # than causing the entire scan to fail.
+            if price_data is None:
+                continue
+
             bookmaker, bookmaker_odds = (
-                best_prices[selection_name]
+                price_data
             )
 
             model_probability = (
                 probability_for_selection(
                     prediction=analysis.prediction,
-                    market="1X2",
-                    selection=selection_name,
+                    market=market,
+                    selection=selection,
                 )
             )
 
             selections.append(
                 MarketSelectionInput(
-                    market="1X2",
-                    selection=selection_name,
+                    market=market,
+                    selection=selection,
                     bookmaker=bookmaker,
                     bookmaker_odds=bookmaker_odds,
-                    model_probability=(
-                        model_probability
-                    ),
+                    model_probability=model_probability,
                 )
+            )
+
+        if not selections:
+            raise NoUsableOddsError(
+                "No bookmaker prices could be mapped "
+                "to model probabilities."
             )
 
         evaluation = evaluate_markets(
@@ -255,7 +337,7 @@ class AutomaticFixtureValueService:
             ),
             evaluation=evaluation,
             odds_requests_remaining=(
-                odds_response
+                event_odds_response
                 .quota
                 .requests_remaining
             ),

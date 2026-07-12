@@ -6,6 +6,7 @@ from app.config import get_settings
 from app.models.odds import (
     OddsBookmaker,
     OddsEvent,
+    OddsEventResponse,
     OddsMarket,
     OddsOutcome,
     OddsQuota,
@@ -35,6 +36,67 @@ class TheOddsApiProvider(OddsProvider):
         markets: list[str],
         bookmakers: list[str] | None = None,
     ) -> OddsResponse:
+        response = await self._request(
+            path=f"/sports/{sport_key}/odds",
+            regions=regions,
+            markets=markets,
+            bookmakers=bookmakers,
+        )
+
+        payload = response.json()
+
+        if not isinstance(payload, list):
+            raise OddsApiError(
+                "The odds provider returned an invalid events list."
+            )
+
+        return OddsResponse(
+            events=[
+                self._map_event(event)
+                for event in payload
+            ],
+            quota=self._map_quota(response),
+        )
+
+    async def get_event_odds(
+        self,
+        *,
+        sport_key: str,
+        event_id: str,
+        regions: list[str],
+        markets: list[str],
+        bookmakers: list[str] | None = None,
+    ) -> OddsEventResponse:
+        response = await self._request(
+            path=(
+                f"/sports/{sport_key}/events/"
+                f"{event_id}/odds"
+            ),
+            regions=regions,
+            markets=markets,
+            bookmakers=bookmakers,
+        )
+
+        payload = response.json()
+
+        if not isinstance(payload, dict):
+            raise OddsApiError(
+                "The odds provider returned invalid event JSON."
+            )
+
+        return OddsEventResponse(
+            event=self._map_event(payload),
+            quota=self._map_quota(response),
+        )
+
+    async def _request(
+        self,
+        *,
+        path: str,
+        regions: list[str],
+        markets: list[str],
+        bookmakers: list[str] | None,
+    ) -> httpx.Response:
         params = {
             "apiKey": self.api_key,
             "markets": ",".join(markets),
@@ -55,7 +117,7 @@ class TheOddsApiProvider(OddsProvider):
                 timeout=20.0,
             ) as client:
                 response = await client.get(
-                    f"/sports/{sport_key}/odds",
+                    path,
                     params=params,
                 )
         except httpx.RequestError as exc:
@@ -66,6 +128,11 @@ class TheOddsApiProvider(OddsProvider):
         if response.status_code == 401:
             raise OddsApiError(
                 "The Odds API key is invalid."
+            )
+
+        if response.status_code == 404:
+            raise OddsApiError(
+                "The requested odds event was not found."
             )
 
         if response.status_code == 422:
@@ -89,35 +156,7 @@ class TheOddsApiProvider(OddsProvider):
                 f"{response.status_code}: {detail}"
             )
 
-        payload = response.json()
-
-        if not isinstance(payload, list):
-            raise OddsApiError(
-                "The odds provider returned invalid JSON."
-            )
-
-        quota = OddsQuota(
-            requests_remaining=self._header_int(
-                response,
-                "x-requests-remaining",
-            ),
-            requests_used=self._header_int(
-                response,
-                "x-requests-used",
-            ),
-            requests_last=self._header_int(
-                response,
-                "x-requests-last",
-            ),
-        )
-
-        return OddsResponse(
-            events=[
-                self._map_event(event)
-                for event in payload
-            ],
-            quota=quota,
-        )
+        return response
 
     @staticmethod
     def _extract_error(
@@ -152,6 +191,25 @@ class TheOddsApiProvider(OddsProvider):
         except ValueError:
             return None
 
+    def _map_quota(
+        self,
+        response: httpx.Response,
+    ) -> OddsQuota:
+        return OddsQuota(
+            requests_remaining=self._header_int(
+                response,
+                "x-requests-remaining",
+            ),
+            requests_used=self._header_int(
+                response,
+                "x-requests-used",
+            ),
+            requests_last=self._header_int(
+                response,
+                "x-requests-last",
+            ),
+        )
+
     def _map_event(
         self,
         raw_event: dict[str, Any],
@@ -160,9 +218,7 @@ class TheOddsApiProvider(OddsProvider):
             id=str(raw_event["id"]),
             sport_key=raw_event["sport_key"],
             sport_title=raw_event["sport_title"],
-            commence_time=(
-                raw_event["commence_time"]
-            ),
+            commence_time=raw_event["commence_time"],
             home_team=raw_event["home_team"],
             away_team=raw_event["away_team"],
             bookmakers=[
@@ -181,8 +237,8 @@ class TheOddsApiProvider(OddsProvider):
         return OddsBookmaker(
             key=raw_bookmaker["key"],
             title=raw_bookmaker["title"],
-            last_update=(
-                raw_bookmaker["last_update"]
+            last_update=raw_bookmaker.get(
+                "last_update"
             ),
             markets=[
                 self._map_market(market)
@@ -205,6 +261,9 @@ class TheOddsApiProvider(OddsProvider):
                     name=outcome["name"],
                     price=outcome["price"],
                     point=outcome.get("point"),
+                    description=outcome.get(
+                        "description"
+                    ),
                 )
                 for outcome in raw_market.get(
                     "outcomes",

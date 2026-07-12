@@ -7,6 +7,7 @@ class OddsOutcome(BaseModel):
     name: str
     price: float = Field(gt=1)
     point: float | None = None
+    description: str | None = None
 
 
 class OddsMarket(BaseModel):
@@ -18,7 +19,10 @@ class OddsMarket(BaseModel):
 class OddsBookmaker(BaseModel):
     key: str
     title: str
-    last_update: datetime
+
+    # The single-event endpoint may omit this field.
+    last_update: datetime | None = None
+
     markets: list[OddsMarket]
 
 
@@ -42,4 +46,9 @@ class OddsQuota(BaseModel):
 
 class OddsResponse(BaseModel):
     events: list[OddsEvent]
+    quota: OddsQuota
+
+
+class OddsEventResponse(BaseModel):
+    event: OddsEvent
     quota: OddsQuota

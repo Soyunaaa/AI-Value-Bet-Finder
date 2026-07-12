@@ -1,6 +1,6 @@
 from app.models.fixture_analysis import TeamFormSummary
 from app.models.team_strength import TeamStrengthRating
-
+from app.models.elo import FixtureEloSummary
 
 def build_reasons(
     *,
@@ -8,6 +8,7 @@ def build_reasons(
     away_form: TeamFormSummary,
     home_strength: TeamStrengthRating,
     away_strength: TeamStrengthRating,
+    elo: FixtureEloSummary,
     home_expected_goals: float,
     away_expected_goals: float,
 ) -> list[str]:
@@ -43,5 +44,11 @@ def build_reasons(
         (
             f"{away_form.team_name} recent points per game: "
             f"{away_form.points_per_game:.2f}."
+        ),        
+        (
+            f"{elo.home.team_name} Elo: "
+            f"{elo.home.rating:.1f}; "
+            f"{elo.away.team_name} Elo: "
+            f"{elo.away.rating:.1f}."
         ),
     ]

@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from app.models.football import FootballFixture
 from app.models.prediction import MatchPredictionResult
 from app.models.team_strength import TeamStrengthRating
-
+from app.models.elo import FixtureEloSummary
 
 class TeamFormSummary(BaseModel):
     team_id: int
@@ -31,9 +31,11 @@ class FixtureAnalysisResult(BaseModel):
     home_strength: TeamStrengthRating
     away_strength: TeamStrengthRating
 
+    elo: FixtureEloSummary
+    
     home_expected_goals: float = Field(ge=0)
     away_expected_goals: float = Field(ge=0)
-
+  
     prediction: MatchPredictionResult
 
     confidence: float = Field(ge=0, le=100)

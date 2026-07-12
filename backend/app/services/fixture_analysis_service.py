@@ -12,13 +12,18 @@ from app.providers.football_data import (
 from app.services.prediction.confidence import (
     calculate_confidence,
 )
+from app.services.prediction.elo import (
+    build_fixture_elo,
+)
 from app.services.prediction.expected_goals import (
     estimate_expected_goals,
 )
 from app.services.prediction.reasons import (
     build_reasons,
 )
-from app.services.prediction_service import predict_match
+from app.services.prediction_service import (
+    predict_match,
+)
 from app.services.team_strength_service import (
     build_team_strength,
 )
@@ -48,8 +53,13 @@ def summarize_team_form(
         if home_score is None or away_score is None:
             continue
 
-        team_is_home = match.home_team.id == team_id
-        team_is_away = match.away_team.id == team_id
+        team_is_home = (
+            match.home_team.id == team_id
+        )
+
+        team_is_away = (
+            match.away_team.id == team_id
+        )
 
         if not team_is_home and not team_is_away:
             continue
@@ -165,36 +175,62 @@ class FixtureAnalysisService:
             matches=away_matches,
         )
 
-        home_expected_goals = estimate_expected_goals(
-            attacking_team=home_strength,
-            defending_team=away_strength,
-            venue_attack_average=(
-                home_strength.home_average_scored
-            ),
-            opponent_venue_conceding_average=(
-                away_strength.away_average_conceded
-            ),
-            home_advantage=True,
+        elo = build_fixture_elo(
+            home_team_id=fixture.home_team.id,
+            home_team_name=fixture.home_team.name,
+            away_team_id=fixture.away_team.id,
+            away_team_name=fixture.away_team.name,
+            matches=[
+                *home_matches,
+                *away_matches,
+            ],
+            as_of=fixture.utc_date,
+)
+
+        home_expected_goals = (
+            estimate_expected_goals(
+                attacking_team=home_strength,
+                defending_team=away_strength,
+                venue_attack_average=(
+                    home_strength.home_average_scored
+                ),
+                opponent_venue_conceding_average=(
+                    away_strength.away_average_conceded
+                ),
+                home_advantage=True,
+                elo_difference=(
+                    elo.rating_difference
+                ),
+            )
         )
 
-        away_expected_goals = estimate_expected_goals(
-            attacking_team=away_strength,
-            defending_team=home_strength,
-            venue_attack_average=(
-                away_strength.away_average_scored
-            ),
-            opponent_venue_conceding_average=(
-                home_strength.home_average_conceded
-            ),
-            home_advantage=False,
+        away_expected_goals = (
+            estimate_expected_goals(
+                attacking_team=away_strength,
+                defending_team=home_strength,
+                venue_attack_average=(
+                    away_strength.away_average_scored
+                ),
+                opponent_venue_conceding_average=(
+                    home_strength.home_average_conceded
+                ),
+                home_advantage=False,
+                elo_difference=(
+                    -elo.rating_difference
+                ),
+            )
         )
 
         prediction = predict_match(
             MatchPredictionRequest(
                 home_team=fixture.home_team.name,
                 away_team=fixture.away_team.name,
-                home_expected_goals=home_expected_goals,
-                away_expected_goals=away_expected_goals,
+                home_expected_goals=(
+                    home_expected_goals
+                ),
+                away_expected_goals=(
+                    away_expected_goals
+                ),
             )
         )
 
@@ -209,7 +245,9 @@ class FixtureAnalysisService:
         confidence = calculate_confidence(
             home_matches=home_form.matches_used,
             away_matches=away_form.matches_used,
-            probability_strength=strongest_probability,
+            probability_strength=(
+                strongest_probability
+            ),
         )
 
         reasons = build_reasons(
@@ -217,8 +255,13 @@ class FixtureAnalysisService:
             away_form=away_form,
             home_strength=home_strength,
             away_strength=away_strength,
-            home_expected_goals=home_expected_goals,
-            away_expected_goals=away_expected_goals,
+            elo=elo,
+            home_expected_goals=(
+                home_expected_goals
+            ),
+            away_expected_goals=(
+                away_expected_goals
+            ),
         )
 
         return FixtureAnalysisResult(
@@ -227,13 +270,19 @@ class FixtureAnalysisService:
             away_form=away_form,
             home_strength=home_strength,
             away_strength=away_strength,
-            home_expected_goals=home_expected_goals,
-            away_expected_goals=away_expected_goals,
+            elo=elo,
+            home_expected_goals=(
+                home_expected_goals
+            ),
+            away_expected_goals=(
+                away_expected_goals
+            ),
             prediction=prediction,
             confidence=confidence,
             reasons=reasons,
         )
 
 
-def get_fixture_analysis_service() -> FixtureAnalysisService:
+def get_fixture_analysis_service(
+) -> FixtureAnalysisService:
     return FixtureAnalysisService()

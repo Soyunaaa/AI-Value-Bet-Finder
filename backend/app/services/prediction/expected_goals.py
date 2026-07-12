@@ -14,6 +14,18 @@ def clamp(
     return max(minimum, min(value, maximum))
 
 
+def elo_goal_multiplier(
+    elo_difference: float,
+) -> float:
+    adjustment = clamp(
+        elo_difference / 800,
+        -0.15,
+        0.15,
+    )
+
+    return 1 + adjustment
+
+
 def estimate_expected_goals(
     *,
     attacking_team: TeamStrengthRating,
@@ -21,6 +33,7 @@ def estimate_expected_goals(
     venue_attack_average: float,
     opponent_venue_conceding_average: float,
     home_advantage: bool,
+    elo_difference: float = 0,
 ) -> float:
     recent_attack_component = (
         attacking_team.average_goals_scored
@@ -45,6 +58,10 @@ def estimate_expected_goals(
         + opponent_defence_component * 0.25
         + venue_component * 0.30
         + rating_component * 1.35 * 0.15
+    )
+
+    expected_goals *= elo_goal_multiplier(
+        elo_difference
     )
 
     if home_advantage:
